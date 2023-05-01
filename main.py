@@ -69,11 +69,15 @@ def sampling(score_model, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sam
     sampler = sampler #@param ['Euler_Maruyama_sampler', 'pc_sampler', 'ode_sampler'] {'type': 'raw'}
 
     ## Generate samples using the specified sampler.
-    samples = sampler(score_model, 
-                    marginal_prob_std_fn,
-                    diffusion_coeff_fn, 
-                    sample_batch_size, 
-                    device=device)
+    samples = sampler(score_model,
+                marginal_prob_std_fn,
+                diffusion_coeff_fn,
+                batch_size=sample_batch_size, 
+                atol=1e-5, 
+                rtol=1e-5, 
+                device='cuda', 
+                z=None,
+                eps=1e-3)
     return samples
 
 def stft_to_signal(stft):
@@ -116,6 +120,8 @@ if __name__ == "__main__":
     train_sub = [1]
     val_sub = [2]
     test_sub = [3]
+
+    sampler = ode_sampler()
 
     score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
     augment(train_sub, score_model0, score_model1, score_model2, score_model3)
