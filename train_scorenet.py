@@ -191,7 +191,7 @@ def train_scorenet(train_x, train_y):
     
     train_stft = Stft_datset(train_x, train_y)
 
-    train_dataloader = DataLoader(train_stft, batch_size=256, num_workers=40)
+    train_dataloader = DataLoader(train_stft, batch_size=32, num_workers=40)
 
     device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 
