@@ -1,5 +1,3 @@
-from typing import Callable
-
 from torch.utils.data import DataLoader, Dataset
 import torch
 
@@ -7,14 +5,17 @@ from utils.load_data import *
 import numpy as np
 from scipy import signal
 
-BCIC_dataset = load_BCIC(
-train_sub=[1,2,3,4,5,6,7,8],
-test_sub=[9],
-alg_name = 'Tensor_CSPNet',
-scenario = 'raw-signal-si'
-)
+import numpy as np
+import torch
+import torch
+import torch.nn as nn
+import numpy as np
 
-train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+import torch
+import functools
+from torch.optim import Adam
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 class Stft_datset(Dataset):
     def __init__(self, x, y):
@@ -30,27 +31,6 @@ class Stft_datset(Dataset):
     
     def __getitem__(self, idx):
         return torch.tensor(self.stft[idx], dtype=torch.float32), self.y[idx]
-    
-train_stft = Stft_datset(train_x, train_y)
-test_stft = Stft_datset(test_x, test_y)
-
-train_dataloader = DataLoader(train_stft, batch_size=32, num_workers=16)
-test_dataloader = DataLoader(test_stft, batch_size=32, num_workers=16)
-
-import os
-import numpy as np
-import torch
-import torchvision
-import torchvision.transforms as transforms
-from lib.sdes import VariancePreservingSDE, PluginReverseSDE
-from lib.plotting import get_grid
-from lib.flows.elemwise import LogitTransform
-from lib.helpers import logging, create
-import json
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 
 class GaussianFourierProjection(nn.Module):
     """Gaussian random features for encoding time steps."""  
@@ -162,9 +142,6 @@ class ScoreNet(nn.Module):
         h = h / self.marginal_prob_std(t)[:, None, None, None, None]
         return h
 
-import functools
-device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
-
 def marginal_prob_std(t, sigma):
     """Compute the mean and standard deviation of $p_{0t}(x(t) | x(0))$.
 
@@ -175,7 +152,7 @@ def marginal_prob_std(t, sigma):
     Returns:
     The standard deviation.
     """    
-    t = torch.tensor(t, device=device)
+    t = torch.tensor(t, device="cuda")
     return torch.sqrt((sigma**(2 * t) - 1.) / 2. / np.log(sigma))
 
 def diffusion_coeff(t, sigma):
@@ -188,7 +165,7 @@ def diffusion_coeff(t, sigma):
     Returns:
     The vector of diffusion coefficients.
     """
-    return torch.tensor(sigma**t, device=device)
+    return torch.tensor(sigma**t, device="cuda")
   
 def loss_fn(model, x, marginal_prob_std, eps=1e-5):
     """The loss function for training score-based generative models.
@@ -208,46 +185,50 @@ def loss_fn(model, x, marginal_prob_std, eps=1e-5):
     score = model(perturbed_x, random_t)
     loss = torch.mean(torch.sum((score * std[:, None, None, None, None] + z)**2, dim=(1,2,3,4)))
     return loss
+    
+    
+def train_scorenet(train_x, train_y):
+    
+    train_stft = Stft_datset(train_x, train_y)
 
-sigma =  0.1#@param {'type':'number'}
-marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
-diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
+    train_dataloader = DataLoader(train_stft, batch_size=256, num_workers=40)
 
-import torch
-import functools
-from torch.optim import Adam
-from torch.utils.data import DataLoader
-import tqdm.notebook as tqdm
-
-
-score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
-score_model = score_model.to(device)
-
-n_epochs =   1000
-
-lr=1e-4
+    device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 
 
-optimizer = Adam(score_model.parameters(), lr=lr)
-scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
-                                        lr_lambda=lambda epoch: 0.999 ** epoch)
-tqdm_epoch = tqdm.tnrange(n_epochs)
-losses = []
+    sigma =  0.1#@param {'type':'number'}
+    marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
+    diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
-for epoch in tqdm_epoch:
-    avg_loss = 0.
-    num_items = 0
-    for x, y in train_dataloader:
-        x = x.to(device).unsqueeze(1)
-        loss = loss_fn(score_model, x, marginal_prob_std_fn)
-        optimizer.zero_grad()
-        loss.backward()    
-        optimizer.step()
-        avg_loss += loss.item() * x.shape[0]
-        num_items += x.shape[0]
-        losses.append(avg_loss / num_items)
-    scheduler.step()
-    # Print the averaged training loss so far.
-    tqdm_epoch.set_description('Average Loss: {:5f}'.format(avg_loss / num_items))
-    # Update the checkpoint after each epoch of training.
-    torch.save(score_model.state_dict(), 'ckpt.pth')
+
+
+    score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
+    score_model = score_model.to(device)
+
+    n_epochs =   1
+
+    lr=1e-4
+
+
+    optimizer = Adam(score_model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
+                                            lr_lambda=lambda epoch: 0.999 ** epoch)
+    tqdm_epoch = tqdm.tnrange(n_epochs)
+    losses = []
+
+    for epoch in tqdm_epoch:
+        avg_loss = 0.
+        num_items = 0
+        for x, y in train_dataloader:
+            x = x.to(device).unsqueeze(1)
+            loss = loss_fn(score_model, x, marginal_prob_std_fn)
+            optimizer.zero_grad()
+            loss.backward()    
+            optimizer.step()
+            avg_loss += loss.item() * x.shape[0]
+            num_items += x.shape[0]
+            losses.append(avg_loss / num_items)
+        scheduler.step()
+        # Print the averaged training loss so far.
+        tqdm_epoch.set_description('Score model Average Loss: {:5f}'.format(avg_loss / num_items))
+    return score_model
