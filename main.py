@@ -64,12 +64,14 @@ def make_valid_test_dataset(val_sub, test_sub):
     train_x, train_y, valid_x, valid_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
     return valid_x, valid_y, test_x, test_y
 
-def sampling(score_model, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size):
+def sampling(score_model, sample_batch_size):
     device = 'cuda'
-    sampler = sampler #@param ['Euler_Maruyama_sampler', 'pc_sampler', 'ode_sampler'] {'type': 'raw'}
-
+    sigma=0.1
+    #@param ['Euler_Maruyama_sampler', 'pc_sampler', 'ode_sampler'] {'type': 'raw'}
+    marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
+    diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
     ## Generate samples using the specified sampler.
-    samples = sampler(score_model,
+    samples = ode_sampler(score_model,
                 marginal_prob_std_fn,
                 diffusion_coeff_fn,
                 batch_size=sample_batch_size, 
@@ -99,11 +101,11 @@ def train_scorenet_by_label(train_sub):
     score_model3 = train_scorenet(train_x3, train_y3)
     return score_model0, score_model1, score_model2, score_model3
 
-def augment(train_sub, sampler, score_model0, score_model1, score_model2, score_model3):
-    samples0 = sampling(score_model0, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
-    samples1 = sampling(score_model1, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
-    samples2 = sampling(score_model2, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
-    samples3 = sampling(score_model3, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
+def augment(train_sub, score_model0, score_model1, score_model2, score_model3):
+    samples0 = sampling(score_model0, sample_batch_size=32)
+    samples1 = sampling(score_model1, sample_batch_size=32)
+    samples2 = sampling(score_model2, sample_batch_size=32)
+    samples3 = sampling(score_model3, sample_batch_size=32)
 
     for i in range(samples0.shape[0]):
         print(samples0.shape)
@@ -120,8 +122,6 @@ if __name__ == "__main__":
     train_sub = [1]
     val_sub = [2]
     test_sub = [3]
-
-    sampler = ode_sampler()
 
     score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
     augment(train_sub, score_model0, score_model1, score_model2, score_model3)
