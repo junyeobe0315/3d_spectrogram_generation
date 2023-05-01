@@ -78,14 +78,28 @@ def stft_to_signal(stft):
     t, x = scipy.signal.istft(stft, fs=250)
     return x
 
-def augment(train_x, train_y, score_model1, score_model2, score_model3, score_model4):
-    samples1 = sampling(score_model1)
-    samples2 = sampling(score_model2)
-    samples3 = sampling(score_model3)
-    samples4 = sampling(score_model4)
+def train_scorenet_by_label(train_sub):
+    train_x0, train_y0 = make_train_dataset(train_sub, 0)
+    score_model0 = train_scorenet(train_x0, train_y0)
 
-    for i in range(samples1.shape[0]):
-        pass
+    train_x1, train_y1 = make_train_dataset(train_sub, 1)
+    score_model1 = train_scorenet(train_x1, train_y1)
+
+    train_x2, train_y2 = make_train_dataset(train_sub, 2)
+    score_model2 = train_scorenet(train_x2, train_y2)
+
+    train_x3, train_y3 = make_train_dataset(train_sub, 3)
+    score_model3 = train_scorenet(train_x3, train_y3)
+    return score_model0, score_model1, score_model2, score_model3
+
+def augment(train_sub, score_model1, score_model2, score_model3, score_model4):
+    samples0 = sampling(score_model1)
+    samples1 = sampling(score_model2)
+    samples2 = sampling(score_model3)
+    samples3 = sampling(score_model4)
+
+    for i in range(samples0.shape[0]):
+        print(samples0.shape)
 
 
 
@@ -95,12 +109,12 @@ if __name__ == "__main__":
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
     device = "cuda"
-    score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
-    score_model = score_model.to(device)
 
     train_sub = [1]
     val_sub = [2]
     test_sub = [3]
 
-    train_x0, train_y0 = make_train_dataset(train_sub, 0)
-    score_model = train_scorenet(train_x0, train_y0)
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
+    augment(train_sub, score_model0, score_model1, score_model2, score_model3)
+
+
