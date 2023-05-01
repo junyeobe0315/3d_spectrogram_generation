@@ -213,7 +213,7 @@ def train_scorenet(train_x, train_y):
     optimizer = Adam(score_model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer,
                                             lr_lambda=lambda epoch: 0.999 ** epoch)
-    tqdm_epoch = tqdm.tnrange(n_epochs)
+    tqdm_epoch = tqdm(range(n_epochs))
     losses = []
 
     for epoch in tqdm_epoch:
