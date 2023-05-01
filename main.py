@@ -43,11 +43,14 @@ def make_train_dataset(train_sub, y_num):
     train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
     
     train = []
+    ys = []
     for idx, x in enumerate(train_x):
         if train_y[idx] == y_num:
             train.append(x)
+            ys.append(train_y[idx])
+
     print("train length : ", len(train))
-    return train, train_y
+    return train, ys
 
 def make_valid_test_dataset(val_sub, test_sub):
     BCIC_dataset = load_BCIC(
