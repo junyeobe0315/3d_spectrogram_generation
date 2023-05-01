@@ -95,11 +95,11 @@ def train_scorenet_by_label(train_sub):
     score_model3 = train_scorenet(train_x3, train_y3)
     return score_model0, score_model1, score_model2, score_model3
 
-def augment(train_sub, score_model1, score_model2, score_model3, score_model4):
-    samples0 = sampling(score_model1)
-    samples1 = sampling(score_model2)
-    samples2 = sampling(score_model3)
-    samples3 = sampling(score_model4)
+def augment(train_sub, sampler, score_model0, score_model1, score_model2, score_model3):
+    samples0 = sampling(score_model0, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
+    samples1 = sampling(score_model1, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
+    samples2 = sampling(score_model2, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
+    samples3 = sampling(score_model3, sampler, marginal_prob_std_fn, diffusion_coeff_fn, sample_batch_size=32)
 
     for i in range(samples0.shape[0]):
         print(samples0.shape)
