@@ -19,18 +19,12 @@ from tqdm import tqdm
 
 class Stft_datset(Dataset):
     def __init__(self, x, y):
-        self.X = x
+        self.x = x
         self.y = y
-        self.stft = []
-        for sig in self.X:
-            f, t, Sxx = signal.stft(sig, fs=250)
-            self.stft.append(np.abs(Sxx))
-        
     def __len__(self):
         return len(self.y)
-    
     def __getitem__(self, idx):
-        return torch.tensor(self.stft[idx], dtype=torch.float32), self.y[idx]
+        return torch.tensor(self.x[idx], dtype=torch.float32), self.y[idx]
 
 class GaussianFourierProjection(nn.Module):
     """Gaussian random features for encoding time steps."""  
@@ -70,7 +64,7 @@ class ScoreNet(nn.Module):
         self.embed = nn.Sequential(GaussianFourierProjection(embed_dim=embed_dim),
              nn.Linear(embed_dim, embed_dim))
         # Encoding layers where the resolution decreases
-        self.conv1 = torch.nn.Conv3d(in_channels=1, out_channels=32, kernel_size=(22,3,3), padding=(0,0,0), bias=False)
+        self.conv1 = torch.nn.Conv3d(in_channels=1, out_channels=32, kernel_size=(44,5,3), padding=(0,0,0), bias=False)
         self.dense1 = Dense(embed_dim, channels[0])
         self.gnorm1 = nn.GroupNorm(4, num_channels=channels[0])
         self.conv2 = torch.nn.Conv3d(in_channels=32, out_channels=64, kernel_size=(1,3,3), padding=(0,0,0), bias=False)
@@ -93,7 +87,7 @@ class ScoreNet(nn.Module):
         self.tconv2 = torch.nn.ConvTranspose3d(in_channels=128, out_channels=32, kernel_size= (1,3,3), padding=(0,0,0), bias=False)   
         self.dense7 = Dense(embed_dim, channels[0])
         self.tgnorm2 = nn.GroupNorm(32, num_channels=channels[0])
-        self.tconv1 = torch.nn.ConvTranspose3d(in_channels=64, out_channels=1, kernel_size= (22,3,3), padding=(0,0,0), bias=False)
+        self.tconv1 = torch.nn.ConvTranspose3d(in_channels=64, out_channels=1, kernel_size= (44,5,3), padding=(0,0,0), bias=False)
 
         # The swish activation function
         self.act = lambda x: x * torch.sigmoid(x)
@@ -191,7 +185,7 @@ def train_scorenet(train_x, train_y):
     
     train_stft = Stft_datset(train_x, train_y)
 
-    train_dataloader = DataLoader(train_stft, batch_size=128, num_workers=0)
+    train_dataloader = DataLoader(train_stft, batch_size=32, num_workers=0)
 
     device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 

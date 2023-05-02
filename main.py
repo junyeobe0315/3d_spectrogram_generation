@@ -46,22 +46,18 @@ def make_train_dataset(train_sub, y_num):
 
     train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
     
-    train = []
     ys = []
     for idx, x in enumerate(train_x):
         if train_y[idx] == y_num:
-            train.append(x)
             ys.append(train_y[idx])
-
-    normalizer = Normalizer()
+    train = []
     for idx, x in enumerate(train_x):
-        normalizer.fit(x)
-        train_x[idx] = normalizer.transform(x)
-            
-    print("train length : ", len(train))
+        f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
+        data = np.concatenate((stft.real, stft.imag), axis=0)
+        train.append(data)
     return train, ys
 
-def make_all_train_dataset(train_sub):
+def make_classifier_train_dataset(train_sub):
     BCIC_dataset = load_BCIC(
     train_sub=train_sub,
     test_sub=[],
@@ -117,11 +113,6 @@ def sampling(score_model, sample_batch_size):
                 z=None,
                 eps=1e-3)
     return samples
-
-def stft_to_signal(stft):
-    print(stft.shape)
-    t, x = scipy.signal.istft(stft, fs=250)
-    return x
 
 def train_scorenet_by_label(train_sub):
     train_x0, train_y0 = make_train_dataset(train_sub, 0)
@@ -190,8 +181,10 @@ def return_to_signal(sample):
     for i in range(sample.shape[0]): # batch size 
         sliced_sample = sample[i][0]
         temp = []
-        for j in range(sliced_sample.shape[0]):
-            generated_stft = sliced_sample[j]
+        for j in range(sliced_sample.shape[0]): # channel
+            generated_stft_real = sliced_sample[j][:22]
+            generated_stft_imag = sliced_sample[j][22:]
+            generated_stft = np.add(generated_stft_real, generated_stft_imag*j)
             t, sig = scipy.signal.istft(generated_stft.cpu(), fs=250)
             temp.append(sig[:1875])
         generated_signal.append(temp)
@@ -265,7 +258,7 @@ def main(train_sub, val_sub, test_sub):
     train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
 
 def train_witout_aug(train_sub, val_sub, test_sub):
-    train_x, train_y = make_all_train_dataset(train_sub)
+    train_x, train_y = make_classifier_train_dataset(train_sub)
     valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
 
     train_set = stft_dataset(train_x, train_y)
