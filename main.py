@@ -207,10 +207,9 @@ class stft_dataset(Dataset):
     def __getitem__(self, idx):
         return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx])
 
-def main(train_sub, val_sub, test_sub):
-    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
-    train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
-
+def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
+    train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
+    
     train_set = stft_dataset(train_x, train_y)
 
     valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
@@ -257,6 +256,13 @@ def main(train_sub, val_sub, test_sub):
 
     clf.fit(train_set, y=None, epochs=n_epochs)
 
+def main(train_sub, val_sub, test_sub):
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
+    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32)
+    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
+    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
+    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
+    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
 
 def train_witout_aug(train_sub, val_sub, test_sub):
     train_x, train_y = make_all_train_dataset(train_sub)
