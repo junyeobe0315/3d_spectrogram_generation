@@ -59,6 +59,17 @@ def make_train_dataset(train_sub, y_num):
     print("train length : ", len(train))
     return train, ys
 
+def make_all_train_dataset(train_sub):
+    BCIC_dataset = load_BCIC(
+    train_sub=train_sub,
+    test_sub=[],
+    alg_name = 'Tensor_CSPNet',
+    scenario = 'raw-signal-si'
+    )
+
+    train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+    return train_x, train_y
+
 def make_valid_test_dataset(val_sub, test_sub):
     BCIC_dataset = load_BCIC(
     train_sub=[],
@@ -227,7 +238,53 @@ def main(train_sub, val_sub, test_sub):
     )
 
     clf.fit(train_set, y=None, epochs=n_epochs)
-    
+
+
+def train_witout_aug(train_sub, val_sub, test_sub):
+    train_x, train_y = make_all_train_dataset(train_sub)
+    valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
+
+    train_set = stft_dataset(train_x, train_y)
+    valid_set = stft_dataset(valid_x, valid_y)
+    test_set = stft_dataset(test_x, test_y)
+
+    n_classes = 4
+    print(train_set.__getitem__(0)[0].shape)
+    n_channels = train_set.__getitem__(0)[0].shape[0]
+    input_window_samples = train_set.__getitem__(0)[0].shape[1]
+
+    model = ShallowFBCSPNet(
+    n_channels,
+    n_classes,
+    input_window_samples=input_window_samples,
+    final_conv_length='auto'
+    ).cuda()
+
+    lr = 0.0625 * 0.01
+    weight_decay = 0
+
+    # For deep4 they should be:
+    # lr = 1 * 0.01
+    # weight_decay = 0.5 * 0.001
+
+    batch_size = 64
+    n_epochs = 50
+
+    clf = EEGClassifier(
+    model,
+    criterion=torch.nn.NLLLoss,
+    optimizer=torch.optim.AdamW,
+    train_split=predefined_split(valid_set),  # using valid_set for validation
+    optimizer__lr=lr,
+    optimizer__weight_decay=weight_decay,
+    batch_size=batch_size,
+    callbacks=[
+        "accuracy", ("lr_scheduler", LRScheduler('CosineAnnealingLR', T_max=n_epochs - 1)),
+    ],
+    device=device,
+    )
+
+    clf.fit(train_set, y=None, epochs=n_epochs)
 
 if __name__ == "__main__":
     sigma = 0.1
@@ -240,4 +297,4 @@ if __name__ == "__main__":
     val_sub = [8]
     test_sub = [9]
 
-    main(train_sub, val_sub, test_sub)
+    train_witout_aug(train_sub, val_sub, test_sub)
