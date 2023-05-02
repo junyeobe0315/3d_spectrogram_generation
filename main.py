@@ -1,4 +1,6 @@
 from train_scorenet import *
+from skorch.helper import predefined_split
+from skorch.callbacks import LRScheduler
 
 from typing import Callable
 
@@ -22,13 +24,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import random
 
 import torch
 import functools
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
+
 from braindecode.datasets import create_from_X_y
+from braindecode import EEGClassifier
+from braindecode.models import ShallowFBCSPNet
+from braindecode.augmentation import AugmentedDataLoader
 from samplers import *
 import scipy
 
@@ -107,10 +114,120 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3):
     samples2 = sampling(score_model2, sample_batch_size=32)
     samples3 = sampling(score_model3, sample_batch_size=32)
 
-    for i in range(samples0.shape[0]):
-        print(samples0.shape)
+    generated_signal0 = return_to_signal(samples0)
+    generated_signal0y = [0. for i in range(len(generated_signal0))]
+    
+    generated_signal1 = return_to_signal(samples1)
+    generated_signal1y = [1. for i in range(len(generated_signal1))]
+    
+    generated_signal2 = return_to_signal(samples2)
+    generated_signal2y = [2. for i in range(len(generated_signal2))]
+    
+    generated_signal3 = return_to_signal(samples3)
+    generated_signal3y = [3. for i in range(len(generated_signal3))]
+    print("generated signal length : ", len(generated_signal0)*4)
+
+    BCIC_dataset = load_BCIC(
+    train_sub=train_sub,
+    test_sub=[],
+    alg_name = 'Tensor_CSPNet',
+    scenario = 'raw-signal-si'
+    )
+
+    train_x, train_y, _, _ = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+    
+    train_x = train_x.tolist()
+    train_y = train_y.tolist()
+
+    train_x.extend(generated_signal0)
+    train_x.extend(generated_signal1)
+    train_x.extend(generated_signal2)
+    train_x.extend(generated_signal3)
+    
+    train_y.extend(generated_signal0y)
+    train_y.extend(generated_signal1y)
+    train_y.extend(generated_signal2y)
+    train_y.extend(generated_signal3y)
+    
+    temp = list(zip(train_x, train_y))
+    random.shuffle(temp)
+    train_x, train_y = zip(*temp)
+
+    return train_x, train_y
 
 
+def return_to_signal(sample):
+    generated_signal = []
+    for i in range(sample.shape[0]): # batch size 
+        sliced_sample = sample[i][0]
+        temp = []
+        for j in range(sliced_sample.shape[0]):
+            generated_stft = sliced_sample[j]
+            t, sig = scipy.signal.istft(generated_stft.cpu(), fs=250)
+            temp.append(sig[:1875])
+        generated_signal.append(temp)
+    return generated_signal
+
+
+class stft_dataset(Dataset):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __len__(self):
+        return len(self.x)
+    def __getitem__(self, idx):
+        return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx])
+
+def main(train_sub, val_sub, test_sub):
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
+    train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3)
+
+    train_set = stft_dataset(train_x, train_y)
+
+    valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
+
+    valid_set = stft_dataset(valid_x, valid_y)
+    test_set = stft_dataset(test_x, test_y)
+
+    n_classes = 4
+    print(train_set.__getitem__(0)[0].shape)
+    n_channels = train_set.__getitem__(0)[0].shape[0]
+    input_window_samples = train_set.__getitem__(0)[0].shape[1]
+
+
+    model = ShallowFBCSPNet(
+    n_channels,
+    n_classes,
+    input_window_samples=input_window_samples,
+    final_conv_length='auto'
+    ).cuda()
+
+    lr = 0.0625 * 0.01
+    weight_decay = 0
+
+    # For deep4 they should be:
+    # lr = 1 * 0.01
+    # weight_decay = 0.5 * 0.001
+
+    batch_size = 64
+    n_epochs = 50
+
+    clf = EEGClassifier(
+    model,
+    criterion=torch.nn.NLLLoss,
+    optimizer=torch.optim.AdamW,
+    train_split=predefined_split(valid_set),  # using valid_set for validation
+    optimizer__lr=lr,
+    optimizer__weight_decay=weight_decay,
+    batch_size=batch_size,
+    callbacks=[
+        "accuracy", ("lr_scheduler", LRScheduler('CosineAnnealingLR', T_max=n_epochs - 1)),
+    ],
+    device=device,
+    )
+
+    clf.fit(train_set, y=None, epochs=n_epochs)
+    
 
 if __name__ == "__main__":
     sigma = 0.1
@@ -119,11 +236,8 @@ if __name__ == "__main__":
 
     device = "cuda"
 
-    train_sub = [1]
-    val_sub = [2]
-    test_sub = [3]
+    train_sub = [1,2,3,4,5,6,7]
+    val_sub = [8]
+    test_sub = [9]
 
-    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
-    augment(train_sub, score_model0, score_model1, score_model2, score_model3)
-
-
+    main(train_sub, val_sub, test_sub)

@@ -205,7 +205,7 @@ def train_scorenet(train_x, train_y):
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs =   1
+    n_epochs = 2000
 
     lr=1e-4
 
