@@ -205,7 +205,7 @@ class stft_dataset(Dataset):
     def __len__(self):
         return len(self.x)
     def __getitem__(self, idx):
-        return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx])
+        return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32)
 
 def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
     train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
