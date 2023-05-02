@@ -190,7 +190,7 @@ def train_scorenet(train_x, train_y):
     device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 
 
-    sigma =  0.1#@param {'type':'number'}
+    sigma =  10#@param {'type':'number'}
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
@@ -199,7 +199,7 @@ def train_scorenet(train_x, train_y):
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs = 10000
+    n_epochs = 500
 
     lr=1e-4
 
@@ -221,7 +221,6 @@ def train_scorenet(train_x, train_y):
             optimizer.step()
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
-            losses.append(avg_loss / num_items)
         scheduler.step()
         # Print the averaged training loss so far.
         tqdm_epoch.set_description('Score model Average Loss: {:5f}'.format(avg_loss / num_items))

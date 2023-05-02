@@ -178,16 +178,20 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3, b
 
 def return_to_signal(sample):
     generated_signal = []
-    for i in range(sample.shape[0]): # batch size 
+    for i in range(sample.shape[0]): # batch 
         sliced_sample = sample[i][0]
         temp = []
-        for j in range(sliced_sample.shape[0]): # channel
-            generated_stft_real = sliced_sample[j][:22]
-            generated_stft_imag = sliced_sample[j][22:]
-            generated_stft = np.add(generated_stft_real, generated_stft_imag*j)
-            t, sig = scipy.signal.istft(generated_stft.cpu(), fs=250)
-            temp.append(sig[:1875])
-        generated_signal.append(temp)
+        generated_stft_real = sliced_sample[:22].cpu().numpy() # real stft channel
+        generated_stft_imag = sliced_sample[22:].cpu().numpy() # imaginary stft channel
+        temp_stft_imag = np.empty_like(generated_stft_imag, dtype=np.complex64)
+        for idx, imag in enumerate(generated_stft_imag): 
+            for idx2, imag2 in enumerate(imag):
+                for idx3, imag3 in enumerate(imag2):
+                    temp_stft_imag[idx][idx2][idx3] = complex(0, imag3)
+        generated_stft = np.add(generated_stft_real, generated_stft_imag)
+        t, sig = scipy.signal.istft(generated_stft, fs=250)
+        temp.append(sig[:1875])
+    generated_signal.append(temp)
     return generated_signal
 
 

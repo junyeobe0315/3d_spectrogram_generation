@@ -26,7 +26,7 @@ def Euler_Maruyama_sampler(score_model,
     Samples.    
   """
   t = torch.ones(batch_size, device=device)
-  init_x = torch.randn(batch_size, 1, 22, 129, 16, device=device) \
+  init_x = torch.randn(batch_size, 1, 44, 129, 16, device=device) \
     * marginal_prob_std(t)[:, None, None, None]
   time_steps = torch.linspace(1., eps, num_steps, device=device)
   step_size = time_steps[0] - time_steps[1]
@@ -66,7 +66,7 @@ def pc_sampler(score_model,
     Samples.
   """
   t = torch.ones(batch_size, device=device)
-  init_x = torch.randn(batch_size, 1, 22, 129, 16, device=device) * marginal_prob_std(t)[:, None, None, None]
+  init_x = torch.randn(batch_size, 1, 44, 129, 16, device=device) * marginal_prob_std(t)[:, None, None, None]
   time_steps = np.linspace(1., eps, num_steps)
   step_size = time_steps[0] - time_steps[1]
   x = init_x
@@ -119,7 +119,7 @@ def ode_sampler(score_model,
   t = torch.ones(batch_size, device=device)
   # Create the latent code
   if z is None:
-    init_x = torch.randn(batch_size, 1, 22, 129, 16, device=device) \
+    init_x = torch.randn(batch_size, 1, 44, 129, 16, device=device) \
       * marginal_prob_std(t)[:, None, None, None, None]
   else:
     init_x = z
