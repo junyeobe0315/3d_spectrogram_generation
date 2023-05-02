@@ -119,11 +119,11 @@ def train_scorenet_by_label(train_sub):
     score_model3 = train_scorenet(train_x3, train_y3)
     return score_model0, score_model1, score_model2, score_model3
 
-def augment(train_sub, score_model0, score_model1, score_model2, score_model3):
-    samples0 = sampling(score_model0, sample_batch_size=32)
-    samples1 = sampling(score_model1, sample_batch_size=32)
-    samples2 = sampling(score_model2, sample_batch_size=32)
-    samples3 = sampling(score_model3, sample_batch_size=32)
+def augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
+    samples0 = sampling(score_model0, sample_batch_size=batch_size)
+    samples1 = sampling(score_model1, sample_batch_size=batch_size)
+    samples2 = sampling(score_model2, sample_batch_size=batch_size)
+    samples3 = sampling(score_model3, sample_batch_size=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
     generated_signal0y = [0. for i in range(len(generated_signal0))]
@@ -191,7 +191,7 @@ class stft_dataset(Dataset):
 
 def main(train_sub, val_sub, test_sub):
     score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
-    train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3)
+    train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
 
     train_set = stft_dataset(train_x, train_y)
 
@@ -293,8 +293,9 @@ if __name__ == "__main__":
 
     device = "cuda"
 
-    train_sub = [1,2,3,4,5,6,7]
-    val_sub = [8]
+    train_sub = [1,2,3,4,5,6,7,8]
+    val_sub = [9]
     test_sub = [9]
 
+    main(train_sub, val_sub, test_sub)
     train_witout_aug(train_sub, val_sub, test_sub)

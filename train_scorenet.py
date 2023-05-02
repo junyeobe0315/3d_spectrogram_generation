@@ -191,7 +191,7 @@ def train_scorenet(train_x, train_y):
     
     train_stft = Stft_datset(train_x, train_y)
 
-    train_dataloader = DataLoader(train_stft, batch_size=32, num_workers=40)
+    train_dataloader = DataLoader(train_stft, batch_size=128, num_workers=0)
 
     device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 
@@ -205,9 +205,9 @@ def train_scorenet(train_x, train_y):
     score_model = torch.nn.DataParallel(ScoreNet(marginal_prob_std=marginal_prob_std_fn))
     score_model = score_model.to(device)
 
-    n_epochs = 2000
+    n_epochs = 5000
 
-    lr=1e-4
+    lr=1e-3
 
 
     optimizer = Adam(score_model.parameters(), lr=lr)
