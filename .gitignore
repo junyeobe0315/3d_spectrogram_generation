@@ -21,5 +21,5 @@ dist/
 *.DS_Store
 .ipynb_checkpoints/
 
-dataset/
-cache/
+dataset
+cache
