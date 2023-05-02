@@ -207,7 +207,7 @@ def train_scorenet(train_x, train_y):
 
     n_epochs = 5000
 
-    lr=1e-3
+    lr=2e-4
 
 
     optimizer = Adam(score_model.parameters(), lr=lr)
