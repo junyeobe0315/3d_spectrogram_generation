@@ -64,30 +64,30 @@ class ScoreNet(nn.Module):
         self.embed = nn.Sequential(GaussianFourierProjection(embed_dim=embed_dim),
              nn.Linear(embed_dim, embed_dim))
         # Encoding layers where the resolution decreases
-        self.conv1 = torch.nn.Conv3d(in_channels=1, out_channels=32, kernel_size=(10,100,3), padding=(0,0,0), bias=False)
+        self.conv1 = torch.nn.Conv3d(in_channels=1, out_channels=32, kernel_size=(22,120,5), padding=(0,0,0), bias=False)
         self.dense1 = Dense(embed_dim, channels[0])
         self.gnorm1 = nn.GroupNorm(4, num_channels=channels[0])
-        self.conv2 = torch.nn.Conv3d(in_channels=32, out_channels=64, kernel_size=(3,3,3), padding=(0,0,0), bias=False)
+        self.conv2 = torch.nn.Conv3d(in_channels=32, out_channels=64, kernel_size=(9,7,5), padding=(0,0,0), bias=False)
         self.dense2 = Dense(embed_dim, channels[1])
         self.gnorm2 = nn.GroupNorm(32, num_channels=channels[1])
-        self.conv3 = torch.nn.Conv3d(in_channels=64, out_channels=128, kernel_size=(3,3,3), padding=(0,0,0), bias=False)
+        self.conv3 = torch.nn.Conv3d(in_channels=64, out_channels=128, kernel_size=(7,1,5), padding=(0,0,0), bias=False)
         self.dense3 = Dense(embed_dim, channels[2])
         self.gnorm3 = nn.GroupNorm(32, num_channels=channels[2])
-        self.conv4 = torch.nn.Conv3d(in_channels=128, out_channels=256, kernel_size=(10,10,3), padding=(0,0,0), bias=False)
+        self.conv4 = torch.nn.Conv3d(in_channels=128, out_channels=256, kernel_size=(3,1,3), padding=(0,0,0), bias=False)
         self.dense4 = Dense(embed_dim, channels[3])
         self.gnorm4 = nn.GroupNorm(32, num_channels=channels[3])    
 
         # Decoding layers where the resolution increases
-        self.tconv4 = torch.nn.ConvTranspose3d(in_channels=256, out_channels=128, kernel_size= (10,10,3), padding=(0,0,0), bias=False)
+        self.tconv4 = torch.nn.ConvTranspose3d(in_channels=256, out_channels=128, kernel_size= (3,1,3), padding=(0,0,0), bias=False)
         self.dense5 = Dense(embed_dim, channels[2])
         self.tgnorm4 = nn.GroupNorm(32, num_channels=channels[2])
-        self.tconv3 = torch.nn.ConvTranspose3d(in_channels=256, out_channels=64, kernel_size= (3,3,3), padding=(0,0,0), bias=False)    
+        self.tconv3 = torch.nn.ConvTranspose3d(in_channels=256, out_channels=64, kernel_size= (7,1,5), padding=(0,0,0), bias=False)    
         self.dense6 = Dense(embed_dim, channels[1])
         self.tgnorm3 = nn.GroupNorm(32, num_channels=channels[1])
-        self.tconv2 = torch.nn.ConvTranspose3d(in_channels=128, out_channels=32, kernel_size= (3,3,3), padding=(0,0,0), bias=False)   
+        self.tconv2 = torch.nn.ConvTranspose3d(in_channels=128, out_channels=32, kernel_size= (9,7,5), padding=(0,0,0), bias=False)   
         self.dense7 = Dense(embed_dim, channels[0])
         self.tgnorm2 = nn.GroupNorm(32, num_channels=channels[0])
-        self.tconv1 = torch.nn.ConvTranspose3d(in_channels=64, out_channels=1, kernel_size= (10,100,3), padding=(0,0,0), bias=False)
+        self.tconv1 = torch.nn.ConvTranspose3d(in_channels=64, out_channels=1, kernel_size= (22,120,5), padding=(0,0,0), bias=False)
 
         # The swish activation function
         self.act = lambda x: x * torch.sigmoid(x)
@@ -185,7 +185,7 @@ def train_scorenet(train_x, train_y):
     
     train_stft = Stft_datset(train_x, train_y)
 
-    train_dataloader = DataLoader(train_stft, batch_size=16, num_workers=0)
+    train_dataloader = DataLoader(train_stft, batch_size=512, num_workers=0)
 
     device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
 
