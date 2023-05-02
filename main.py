@@ -26,6 +26,7 @@ import torch
 import functools
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import Normalizer
 
 
 from braindecode.datasets import create_from_X_y
@@ -52,6 +53,11 @@ def make_train_dataset(train_sub, y_num):
             train.append(x)
             ys.append(train_y[idx])
 
+    normalizer = Normalizer()
+    for idx, x in enumerate(train_x):
+        normalizer.fit(x)
+        train_x[idx] = normalizer.transform(x)
+            
     print("train length : ", len(train))
     return train, ys
 
@@ -64,6 +70,11 @@ def make_all_train_dataset(train_sub):
     )
 
     train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+    
+    normalizer = Normalizer()
+    for idx, x in enumerate(train_x):
+        normalizer.fit(x)
+        train_x[idx] = normalizer.transform(x)
     return train_x, train_y
 
 def make_valid_test_dataset(val_sub, test_sub):
@@ -76,6 +87,17 @@ def make_valid_test_dataset(val_sub, test_sub):
     )
 
     train_x, train_y, valid_x, valid_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+    
+    normalizer = Normalizer()
+    for idx, x in enumerate(valid_x):
+        normalizer.fit(x)
+        valid_x[idx] = normalizer.transform(x)
+    
+    normalizer = Normalizer()
+    for idx, x in enumerate(test_x):
+        normalizer.fit(x)
+        test_x[idx] = normalizer.transform(x)
+    
     return valid_x, valid_y, test_x, test_y
 
 def sampling(score_model, sample_batch_size):
