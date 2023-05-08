@@ -73,7 +73,7 @@ class ScoreNet(nn.Module):
         self.conv3 = torch.nn.Conv3d(in_channels=64, out_channels=128, kernel_size=(1,1,14), padding=(0,0,0), bias=False)
         self.dense3 = Dense(embed_dim, channels[2])
         self.gnorm3 = nn.GroupNorm(32, num_channels=channels[2])
-        self.conv4 = torch.nn.Conv3d(in_channels=128, out_channels=256, kernel_size=(4,11,2), padding=(0,0,0), bias=False)
+        self.conv4 = torch.nn.Conv3d(in_channels=128, out_channels=256, kernel_size=(4,10,2), padding=(0,0,0), bias=False)
         self.dense4 = Dense(embed_dim, channels[3])
         self.gnorm4 = nn.GroupNorm(32, num_channels=channels[3])
         self.conv5 = torch.nn.Conv3d(in_channels=256, out_channels=512, kernel_size=(4,10,2), padding=(0,0,0), bias=False)
@@ -91,7 +91,7 @@ class ScoreNet(nn.Module):
         self.tconv5 = torch.nn.ConvTranspose3d(in_channels=1024, out_channels=256, kernel_size= (4,10,2), padding=(0,0,0), bias=False)
         self.dense8 = Dense(embed_dim, 256)
         self.tgnorm5 = nn.GroupNorm(32, num_channels=256)
-        self.tconv4 = torch.nn.ConvTranspose3d(in_channels=512, out_channels=128, kernel_size= (4,11,2), padding=(0,0,0), bias=False)
+        self.tconv4 = torch.nn.ConvTranspose3d(in_channels=512, out_channels=128, kernel_size= (4,10,2), padding=(0,0,0), bias=False)
         self.dense5 = Dense(embed_dim, channels[2])
         self.tgnorm4 = nn.GroupNorm(32, num_channels=channels[2])
         self.tconv3 = torch.nn.ConvTranspose3d(in_channels=256, out_channels=64, kernel_size= (1,1,14), padding=(0,0,0), bias=False)
@@ -222,10 +222,10 @@ def train_scorenet(train_x, train_y):
 
     train_dataloader = DataLoader(train_stft, batch_size=32, num_workers=0)
 
-    device = 'cuda' #@param ['cuda', 'cpu'] {'type':'string'}
+    device = 'cuda' 
 
 
-    sigma =  25#@param {'type':'number'}
+    sigma =  500
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 

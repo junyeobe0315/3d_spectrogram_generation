@@ -1,4 +1,5 @@
 from train_scorenet import *
+from samplers import *
 from skorch.helper import predefined_split
 from skorch.callbacks import LRScheduler
 
@@ -105,15 +106,13 @@ def sampling(score_model, sample_batch_size):
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
     ## Generate samples using the specified sampler.
-    samples = ode_sampler(score_model,
-                marginal_prob_std_fn,
-                diffusion_coeff_fn,
-                batch_size=sample_batch_size, 
-                atol=1e-5, 
-                rtol=1e-5, 
-                device='cuda', 
-                z=None,
-                eps=1e-3)
+    samples = Euler_Maruyama_sampler(score_model, 
+                           marginal_prob_std_fn,
+                           diffusion_coeff_fn, 
+                           batch_size=sample_batch_size, 
+                           num_steps=500, 
+                           device='cuda', 
+                           eps=1e-3)
     for batch_size in range(samples.shape[0]):
         for chanels in range(samples.shape[1]):
             for x in range(samples.shape[2]):
@@ -312,7 +311,7 @@ def train_witout_aug(train_sub, val_sub, test_sub):
     clf.fit(train_set, y=None, epochs=n_epochs)
 
 if __name__ == "__main__":
-    sigma = 25
+    sigma = 50
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
