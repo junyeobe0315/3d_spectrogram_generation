@@ -52,7 +52,6 @@ def make_train_dataset(train_sub, y_num):
         if train_y[idx] == y_num:
             ys.append(train_y[idx])
     train = []
-    normalizer = Normalizer()
     for idx, x in enumerate(train_x):
         f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
         data = np.concatenate((stft.real, stft.imag), axis=0)
@@ -113,11 +112,13 @@ def sampling(score_model, sample_batch_size):
                            num_steps=500, 
                            device='cuda', 
                            eps=1e-3)
+    
     for batch_size in range(samples.shape[0]):
         for chanels in range(samples.shape[1]):
             for x in range(samples.shape[2]):
                 for y in range(samples.shape[3]):
                     samples[batch_size][chanels][x][y] *= 5
+    
     return samples
 
 def train_scorenet_by_label(train_sub):

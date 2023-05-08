@@ -216,7 +216,7 @@ def loss_fn(model, x, marginal_prob_std, eps=1e-5):
     return loss
     
     
-def train_scorenet(train_x, train_y):
+def train_scorenet(train_x, train_y, sigma):
     
     train_stft = Stft_datset(train_x, train_y)
 
@@ -225,7 +225,6 @@ def train_scorenet(train_x, train_y):
     device = 'cuda' 
 
 
-    sigma =  500
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
@@ -240,7 +239,7 @@ def train_scorenet(train_x, train_y):
 
 
     optimizer = Adam(score_model.parameters(), lr=lr)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min',patience=100)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min',patience=10, factor=0.9)
 
     tqdm_epoch = tqdm(range(n_epochs))
     losses = []
