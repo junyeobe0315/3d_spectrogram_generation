@@ -51,9 +51,11 @@ def make_train_dataset(train_sub, y_num):
         if train_y[idx] == y_num:
             ys.append(train_y[idx])
     train = []
+    normalizer = Normalizer()
     for idx, x in enumerate(train_x):
         f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
         data = np.concatenate((stft.real, stft.imag), axis=0)
+        data /= 5
         train.append(data)
     return train, ys
 
@@ -112,6 +114,11 @@ def sampling(score_model, sample_batch_size):
                 device='cuda', 
                 z=None,
                 eps=1e-3)
+    for batch_size in range(samples.shape[0]):
+        for chanels in range(samples.shape[1]):
+            for x in range(samples.shape[2]):
+                for y in range(samples.shape[3]):
+                    samples[batch_size][chanels][x][y] *= 5
     return samples
 
 def train_scorenet_by_label(train_sub):
@@ -181,13 +188,10 @@ def return_to_signal(sample):
     for i in range(sample.shape[0]): # batch 
         sliced_sample = sample[i][0]
         temp = []
-        generated_stft_real = sliced_sample[:22].cpu().numpy() # real stft channel
-        generated_stft_imag = sliced_sample[22:].cpu().numpy() # imaginary stft channel
-        temp_stft_imag = np.empty_like(generated_stft_imag, dtype=np.complex64)
+        generated_stft_real = sliced_sample[:22].cpu() # real stft channel
+        generated_stft_imag = sliced_sample[22:].cpu() # imaginary stft channel
         for idx, imag in enumerate(generated_stft_imag): 
-            for idx2, imag2 in enumerate(imag):
-                for idx3, imag3 in enumerate(imag2):
-                    temp_stft_imag[idx][idx2][idx3] = complex(0, imag3)
+            generated_stft_imag[idx] = np.multiply(imag, complex(0,1))
         generated_stft = np.add(generated_stft_real, generated_stft_imag)
         t, sig = scipy.signal.istft(generated_stft, fs=250)
         temp.append(sig[:1875])
@@ -308,7 +312,7 @@ def train_witout_aug(train_sub, val_sub, test_sub):
     clf.fit(train_set, y=None, epochs=n_epochs)
 
 if __name__ == "__main__":
-    sigma = 0.1
+    sigma = 25
     marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
     diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
