@@ -98,7 +98,7 @@ def make_valid_test_dataset(val_sub, test_sub):
     
     return valid_x, valid_y, test_x, test_y
 
-def sampling(score_model, sample_batch_size):
+def sampling(score_model, sample_batch_size, sigma):
     device = 'cuda'
     sigma=0.1
     #@param ['Euler_Maruyama_sampler', 'pc_sampler', 'ode_sampler'] {'type': 'raw'}
@@ -121,25 +121,25 @@ def sampling(score_model, sample_batch_size):
     
     return samples
 
-def train_scorenet_by_label(train_sub):
+def train_scorenet_by_label(train_sub, sigma):
     train_x0, train_y0 = make_train_dataset(train_sub, 0)
-    score_model0 = train_scorenet(train_x0, train_y0)
+    score_model0 = train_scorenet(train_x0, train_y0, sigma)
 
     train_x1, train_y1 = make_train_dataset(train_sub, 1)
-    score_model1 = train_scorenet(train_x1, train_y1)
+    score_model1 = train_scorenet(train_x1, train_y1, sigma)
 
     train_x2, train_y2 = make_train_dataset(train_sub, 2)
-    score_model2 = train_scorenet(train_x2, train_y2)
+    score_model2 = train_scorenet(train_x2, train_y2, sigma)
 
     train_x3, train_y3 = make_train_dataset(train_sub, 3)
-    score_model3 = train_scorenet(train_x3, train_y3)
+    score_model3 = train_scorenet(train_x3, train_y3, sigma)
     return score_model0, score_model1, score_model2, score_model3
 
 def augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
-    samples0 = sampling(score_model0, sample_batch_size=batch_size)
-    samples1 = sampling(score_model1, sample_batch_size=batch_size)
-    samples2 = sampling(score_model2, sample_batch_size=batch_size)
-    samples3 = sampling(score_model3, sample_batch_size=batch_size)
+    samples0 = sampling(score_model0, sample_batch_size=batch_size, sigma=sigma)
+    samples1 = sampling(score_model1, sample_batch_size=batch_size, sigma=sigma)
+    samples2 = sampling(score_model2, sample_batch_size=batch_size, sigma=sigma)
+    samples3 = sampling(score_model3, sample_batch_size=batch_size, sigma=sigma)
 
     generated_signal0 = return_to_signal(samples0)
     generated_signal0y = [0. for i in range(len(generated_signal0))]
@@ -176,10 +176,6 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3, b
     train_y.extend(generated_signal2y)
     train_y.extend(generated_signal3y)
     
-    temp = list(zip(train_x, train_y))
-    random.shuffle(temp)
-    train_x, train_y = zip(*temp)
-
     return train_x, train_y
 
 
@@ -257,8 +253,8 @@ def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2,
 
     clf.fit(train_set, y=None, epochs=n_epochs)
 
-def main(train_sub, val_sub, test_sub):
-    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
+def main(train_sub, val_sub, sigma):
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub, sigma)
     train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32)
     train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
     train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
@@ -322,5 +318,5 @@ if __name__ == "__main__":
     val_sub = [9]
     test_sub = [9]
 
-    main(train_sub, val_sub, test_sub)
+    main(train_sub, val_sub, sigma)
     train_witout_aug(train_sub, val_sub, test_sub)
