@@ -32,32 +32,10 @@ from sklearn.preprocessing import Normalizer
 
 from braindecode.datasets import create_from_X_y
 from braindecode import EEGClassifier
-from braindecode.models import ShallowFBCSPNet
+from braindecode.models import ShallowFBCSPNet, EEGITNet, EEGNetv4
 from braindecode.augmentation import AugmentedDataLoader
 from samplers import *
 import scipy
-
-def make_train_dataset(train_sub, y_num):
-    BCIC_dataset = load_BCIC(
-    train_sub=train_sub,
-    test_sub=[],
-    alg_name = 'Tensor_CSPNet',
-    scenario = 'raw-signal-si'
-    )
-
-    train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
-    
-    ys = []
-    for idx, x in enumerate(train_x):
-        if train_y[idx] == y_num:
-            ys.append(train_y[idx])
-    train = []
-    for idx, x in enumerate(train_x):
-        f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
-        data = np.concatenate((stft.real, stft.imag), axis=0)
-        data /= 5
-        train.append(data)
-    return train, ys
 
 def make_classifier_train_dataset(train_sub):
     BCIC_dataset = load_BCIC(
@@ -73,6 +51,7 @@ def make_classifier_train_dataset(train_sub):
     for idx, x in enumerate(train_x):
         normalizer.fit(x)
         train_x[idx] = normalizer.transform(x)
+
     return train_x, train_y
 
 def make_valid_test_dataset(val_sub, test_sub):
@@ -98,60 +77,50 @@ def make_valid_test_dataset(val_sub, test_sub):
     
     return valid_x, valid_y, test_x, test_y
 
-def sampling(score_model, sample_batch_size, sigma):
-    device = 'cuda'
-    sigma=0.1
-    #@param ['Euler_Maruyama_sampler', 'pc_sampler', 'ode_sampler'] {'type': 'raw'}
-    marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
-    diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
-    ## Generate samples using the specified sampler.
-    samples = Euler_Maruyama_sampler(score_model, 
-                           marginal_prob_std_fn,
-                           diffusion_coeff_fn, 
-                           batch_size=sample_batch_size, 
-                           num_steps=500, 
-                           device='cuda', 
-                           eps=1e-3)
+def sampling(model, sample_number):
+    beta_1 = 1e-4
+    beta_T = 0.02
+    T = 500
+    shape = (44, 126, 16)
+    device = torch.device('cuda')
     
-    for batch_size in range(samples.shape[0]):
-        for chanels in range(samples.shape[1]):
-            for x in range(samples.shape[2]):
-                for y in range(samples.shape[3]):
-                    samples[batch_size][chanels][x][y] *= 5
+    process = DiffusionProcess(beta_1, beta_T, T, model, device, shape)
+    sample = process.sampling(sample_number, only_final=True)
     
-    return samples
+    print("Generated samples shape : ", sample.shape)
+    return sample
 
-def train_scorenet_by_label(train_sub, sigma):
+def train_scorenet_by_label(train_sub):
     train_x0, train_y0 = make_train_dataset(train_sub, 0)
-    score_model0 = train_scorenet(train_x0, train_y0, sigma)
+    score_model0 = train_scorenet(train_x0, train_y0)
 
     train_x1, train_y1 = make_train_dataset(train_sub, 1)
-    score_model1 = train_scorenet(train_x1, train_y1, sigma)
+    score_model1 = train_scorenet(train_x1, train_y1)
 
     train_x2, train_y2 = make_train_dataset(train_sub, 2)
-    score_model2 = train_scorenet(train_x2, train_y2, sigma)
+    score_model2 = train_scorenet(train_x2, train_y2)
 
     train_x3, train_y3 = make_train_dataset(train_sub, 3)
-    score_model3 = train_scorenet(train_x3, train_y3, sigma)
+    score_model3 = train_scorenet(train_x3, train_y3)
     return score_model0, score_model1, score_model2, score_model3
 
 def augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
-    samples0 = sampling(score_model0, sample_batch_size=batch_size, sigma=sigma)
-    samples1 = sampling(score_model1, sample_batch_size=batch_size, sigma=sigma)
-    samples2 = sampling(score_model2, sample_batch_size=batch_size, sigma=sigma)
-    samples3 = sampling(score_model3, sample_batch_size=batch_size, sigma=sigma)
+    samples0 = sampling(score_model0, sample_number=batch_size)
+    samples1 = sampling(score_model1, sample_number=batch_size)
+    samples2 = sampling(score_model2, sample_number=batch_size)
+    samples3 = sampling(score_model3, sample_number=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
-    generated_signal0y = [0. for i in range(len(generated_signal0))]
+    generated_signal0y = [0.0 for i in range(len(generated_signal0))]
     
     generated_signal1 = return_to_signal(samples1)
-    generated_signal1y = [1. for i in range(len(generated_signal1))]
+    generated_signal1y = [1.0 for i in range(len(generated_signal1))]
     
     generated_signal2 = return_to_signal(samples2)
-    generated_signal2y = [2. for i in range(len(generated_signal2))]
+    generated_signal2y = [2.0 for i in range(len(generated_signal2))]
     
     generated_signal3 = return_to_signal(samples3)
-    generated_signal3y = [3. for i in range(len(generated_signal3))]
+    generated_signal3y = [3.0 for i in range(len(generated_signal3))]
     print("generated signal length : ", len(generated_signal0)*4)
 
     BCIC_dataset = load_BCIC(
@@ -170,6 +139,12 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3, b
     train_x.extend(generated_signal1)
     train_x.extend(generated_signal2)
     train_x.extend(generated_signal3)
+
+    normalizer = Normalizer()
+    for idx, x in enumerate(train_x):
+        normalizer.fit(x)
+        train_x[idx] = normalizer.transform(x)
+        
     
     train_y.extend(generated_signal0y)
     train_y.extend(generated_signal1y)
@@ -181,17 +156,17 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3, b
 
 def return_to_signal(sample):
     generated_signal = []
-    for i in range(sample.shape[0]): # batch 
-        sliced_sample = sample[i][0]
-        temp = []
+    for batch in range(sample.shape[0]): # batch size
+        sliced_sample = sample[batch]
         generated_stft_real = sliced_sample[:22].cpu() # real stft channel
         generated_stft_imag = sliced_sample[22:].cpu() # imaginary stft channel
         for idx, imag in enumerate(generated_stft_imag): 
             generated_stft_imag[idx] = np.multiply(imag, complex(0,1))
         generated_stft = np.add(generated_stft_real, generated_stft_imag)
-        t, sig = scipy.signal.istft(generated_stft, fs=250)
-        temp.append(sig[:1875])
-    generated_signal.append(temp)
+        t, sig = scipy.signal.istft(generated_stft, fs=250, nperseg=250)
+        generated_signal.append(sig)
+    generated_signal = np.array(generated_signal)
+    print("Generated signal shape : ", generated_signal.shape)
     return generated_signal
 
 
@@ -204,7 +179,7 @@ class stft_dataset(Dataset):
     def __getitem__(self, idx):
         return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32)
 
-def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
+def train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
     train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
     
     train_set = stft_dataset(train_x, train_y)
@@ -218,13 +193,12 @@ def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2,
     print(train_set.__getitem__(0)[0].shape)
     n_channels = train_set.__getitem__(0)[0].shape[0]
     input_window_samples = train_set.__getitem__(0)[0].shape[1]
+    device = torch.device("cuda")
 
-
-    model = ShallowFBCSPNet(
+    model = EEGNetv4(
     n_channels,
     n_classes,
     input_window_samples=input_window_samples,
-    final_conv_length='auto'
     ).cuda()
 
     lr = 0.0625 * 0.01
@@ -236,7 +210,7 @@ def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2,
 
     batch_size = 64
     n_epochs = 50
-
+    
     clf = EEGClassifier(
     model,
     criterion=torch.nn.NLLLoss,
@@ -253,13 +227,13 @@ def train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2,
 
     clf.fit(train_set, y=None, epochs=n_epochs)
 
-def main(train_sub, val_sub, sigma):
-    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub, sigma)
-    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32)
-    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
-    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
-    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
-    train_with_aug(train_sub, val_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
+def main(train_sub, val_sub, test_sub):
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
 
 def train_witout_aug(train_sub, val_sub, test_sub):
     train_x, train_y = make_classifier_train_dataset(train_sub)
@@ -274,11 +248,10 @@ def train_witout_aug(train_sub, val_sub, test_sub):
     n_channels = train_set.__getitem__(0)[0].shape[0]
     input_window_samples = train_set.__getitem__(0)[0].shape[1]
 
-    model = ShallowFBCSPNet(
+    model = EEGNetv4(
     n_channels,
     n_classes,
     input_window_samples=input_window_samples,
-    final_conv_length='auto'
     ).cuda()
 
     lr = 0.0625 * 0.01
@@ -308,15 +281,12 @@ def train_witout_aug(train_sub, val_sub, test_sub):
     clf.fit(train_set, y=None, epochs=n_epochs)
 
 if __name__ == "__main__":
-    sigma = 50
-    marginal_prob_std_fn = functools.partial(marginal_prob_std, sigma=sigma)
-    diffusion_coeff_fn = functools.partial(diffusion_coeff, sigma=sigma)
 
-    device = "cuda"
+    device = torch.device("cuda")
 
     train_sub = [1,2,3,4,5,6,7,8]
     val_sub = [9]
     test_sub = [9]
 
-    main(train_sub, val_sub, sigma)
+    main(train_sub, val_sub, test_sub)
     train_witout_aug(train_sub, val_sub, test_sub)
