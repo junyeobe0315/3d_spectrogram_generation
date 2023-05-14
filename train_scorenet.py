@@ -51,15 +51,15 @@ def train_scorenet(train_x, train_y):
     dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=0, drop_last=True)
 
     # model setup
-    net_model = UNet(T=1000, ch=256, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=3, dropout=0.1)
+    net_model = nn.DataParallel(UNet(T=1000, ch=256, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=3, dropout=0.1))
 
     optim = torch.optim.Adam(net_model.parameters(), lr=0.0001)
     
-    trainer = GaussianDiffusionTrainer(net_model, 1e-4, 0.02, 1000)
+    trainer = GaussianDiffusionTrainer(net_model, 1e-4, 0.02, 1000).cuda()
     trainer = torch.nn.DataParallel(trainer)
 
     # start training
-    with tqdm(range(200), dynamic_ncols=True) as pbar:
+    with tqdm(range(2000), dynamic_ncols=True) as pbar:
         for step in pbar:
             losses = []
             num_items = 0
@@ -68,7 +68,7 @@ def train_scorenet(train_x, train_y):
             for x, y in dataloader:
                 optim.zero_grad()
                 x = x.cuda()
-                loss = trainer(x).mean()
+                loss = trainer(x)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(net_model.parameters(), 1)
                 optim.step()

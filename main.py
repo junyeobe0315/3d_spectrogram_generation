@@ -297,5 +297,4 @@ if __name__ == "__main__":
     train_sub = [1,2,3,4,5,6,7,8]
     val_sub = [9]
     test_sub = [9]
-    train_witout_aug(train_sub, val_sub, test_sub)
     main(train_sub, val_sub, test_sub)

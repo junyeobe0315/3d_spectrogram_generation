@@ -30,11 +30,13 @@ class GaussianDiffusionTrainer(nn.Module):
     def forward(self, x_0):
         self.alphas_bar = self.alphas_bar.to(x_0.device)
         idx = torch.randint(0, len(self.alphas_bar), (x_0.shape[0], )).to(x_0.device)
-        used_alpha_bars = self.alphas_bar[idx][:, None, None, None]
+        used_alpha_bars = self.alphas_bar[idx][:, None, None, None].to(x_0.device)
         epsilon = torch.randn_like(x_0).to(x_0.device)
         x_tilde = torch.sqrt(used_alpha_bars).to(x_0.device) * x_0 + torch.sqrt(1 - used_alpha_bars).to(x_0.device) * epsilon
+        print(x_tilde.device)
+        print(idx.device)
         output = self.model(x_tilde, idx).to(x_0.device)
-        loss = (output - epsilon).square().mean().to(x_0.device)
+        loss = (output - epsilon).to(x_0.device).square().mean()
         return loss
 
 class GaussianDiffusionSampler(nn.Module):
