@@ -19,33 +19,27 @@ class GaussianDiffusionTrainer(nn.Module):
         self.model = model
         self.T = T
 
-        self.register_buffer(
-            'betas', torch.linspace(beta_1, beta_T, T).double())
+        self.betas = torch.linspace(beta_1, beta_T, T).float()
         alphas = 1. - self.betas
-        alphas_bar = torch.cumprod(alphas, dim=0)
+        self.alphas_bar = torch.cumprod(alphas, dim=0)
 
         # calculations for diffusion q(x_t | x_{t-1}) and others
-        self.register_buffer(
-            'sqrt_alphas_bar', torch.sqrt(alphas_bar))
-        self.register_buffer(
-            'sqrt_one_minus_alphas_bar', torch.sqrt(1. - alphas_bar))
+        self.sqrt_alphas_bar = torch.sqrt(self.alphas_bar)
+        self.sqrt_one_minus_alphas_bar = torch.sqrt(1. - self.alphas_bar)
 
     def forward(self, x_0):
-        """
-        Algorithm 1.
-        """
-        t = torch.randint(self.T, size=(x_0.shape[0], ), device=x_0.device)
-        noise = torch.randn_like(x_0)
-        x_t = (
-            extract(self.sqrt_alphas_bar, t, x_0.shape) * x_0 +
-            extract(self.sqrt_one_minus_alphas_bar, t, x_0.shape) * noise)
-        loss = F.mse_loss(self.model(x_t, t), noise, reduction='none')
+        self.alphas_bar = self.alphas_bar.to(x_0.device)
+        idx = torch.randint(0, len(self.alphas_bar), (x_0.shape[0], )).to(x_0.device)
+        used_alpha_bars = self.alphas_bar[idx][:, None, None, None]
+        epsilon = torch.randn_like(x_0).to(x_0.device)
+        x_tilde = torch.sqrt(used_alpha_bars).to(x_0.device) * x_0 + torch.sqrt(1 - used_alpha_bars).to(x_0.device) * epsilon
+        output = self.model(x_tilde, idx).to(x_0.device)
+        loss = (output - epsilon).square().mean().to(x_0.device)
         return loss
 
-
 class GaussianDiffusionSampler(nn.Module):
-    def __init__(self, model, beta_1, beta_T, T, img_size=32,
-                 mean_type='eps', var_type='fixedlarge'):
+    def __init__(self, model, beta_1=1e-4, beta_T=0.02, T=1000, img_size=32,
+                 mean_type='epsilon', var_type='fixedlarge'):
         assert mean_type in ['xprev' 'xstart', 'epsilon']
         assert var_type in ['fixedlarge', 'fixedsmall']
         super().__init__()

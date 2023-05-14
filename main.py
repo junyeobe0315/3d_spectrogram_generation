@@ -77,13 +77,12 @@ def make_valid_test_dataset(val_sub, test_sub):
     
     return valid_x, valid_y, test_x, test_y
 
-def sampling(sampler, model, num_images):
+def sampling(sampler, model, num_images=32):
     model.eval()
     with torch.no_grad():
         images = []
-        desc = "generating images"
-        for i in tqdm(range(num_images)):
-            x_T = torch.randn((1, 44, 126, 16))
+        for i in tqdm(range(int(num_images/32))):
+            x_T = torch.randn((32, 44, 126, 16))
             batch_images = sampler(x_T.cuda()).cpu()
             images.append((batch_images + 1) / 2)
         samples = torch.cat(images, dim=0).numpy()
@@ -104,16 +103,16 @@ def train_scorenet_by_label(train_sub):
     return score_model0, score_model1, score_model2, score_model3
 
 def augment(train_sub, model0, model1, model2, model3, batch_size=32):
-    sampler0 = GaussianDiffusionSampler(model0, 1e-4, 0.02, 500, (44,126,16), 'epsilon', 'fixedlarge').cuda()
+    sampler0 = nn.DataParallel(GaussianDiffusionSampler(model0).cuda())
     samples0 = sampling(sampler0, model0, num_images=batch_size)
     
-    sampler1 = GaussianDiffusionSampler(model1, 1e-4, 0.02, 500, (44,126,16), 'epsilon', 'fixedlarge').cuda()
+    sampler1 = nn.DataParallel(GaussianDiffusionSampler(model1).cuda())
     samples1 = sampling(sampler1, model1, num_images=batch_size)
     
-    sampler2 = GaussianDiffusionSampler(model2, 1e-4, 0.02, 500, (44,126,16), 'epsilon', 'fixedlarge').cuda()
+    sampler2 = nn.DataParallel(GaussianDiffusionSampler(model2).cuda())
     samples2 = sampling(sampler2, model2, num_images=batch_size)
 
-    sampler3 = GaussianDiffusionSampler(model3, 1e-4, 0.02, 500, (44,126,16), 'epsilon', 'fixedlarge').cuda()
+    sampler3 = nn.DataParallel(GaussianDiffusionSampler(model3).cuda())
     samples3 = sampling(sampler3, model3, num_images=batch_size)
 
     generated_signal0 = return_to_signal(samples0)

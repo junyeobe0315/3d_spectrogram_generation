@@ -8,15 +8,7 @@ from scipy import signal
 
 import numpy as np
 import torch
-import torch
-import torch.nn as nn
-import numpy as np
 
-import torch
-import functools
-from torch.optim import Adam, lr_scheduler
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 from tqdm import tqdm
 import scipy
 from models import *
@@ -56,18 +48,18 @@ class Stft_dataset(Dataset):
 def train_scorenet(train_x, train_y):
     # dataset
     train_stft = Stft_dataset(train_x, train_y)
-    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=2, drop_last=True)
+    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=0, drop_last=True)
 
     # model setup
-    net_model = UNet(T=1000, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=4, dropout=0.5)
+    net_model = UNet(T=1000, ch=256, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=3, dropout=0.1)
 
-    optim = torch.optim.Adam(net_model.parameters(), lr=2e-4)
+    optim = torch.optim.Adam(net_model.parameters(), lr=0.0001)
     
-    trainer = GaussianDiffusionTrainer(net_model, 1e-4, 0.02, 500).cuda()
+    trainer = GaussianDiffusionTrainer(net_model, 1e-4, 0.02, 1000)
     trainer = torch.nn.DataParallel(trainer)
 
     # start training
-    with tqdm(range(500), dynamic_ncols=True) as pbar:
+    with tqdm(range(200), dynamic_ncols=True) as pbar:
         for step in pbar:
             losses = []
             num_items = 0
