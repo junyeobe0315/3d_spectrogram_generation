@@ -54,45 +54,34 @@ class Stft_dataset(Dataset):
         return torch.tensor(self.x[idx], dtype=torch.float32), self.y[idx]
     
 def train_scorenet(train_x, train_y):
-    
+    # dataset
     train_stft = Stft_dataset(train_x, train_y)
+    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=2, drop_last=True)
 
-    beta_1 = 1e-4
-    beta_T = 0.02
-    T = 500
-    shape = (44, 126, 16)
-    device = torch.device('cuda')
+    # model setup
+    net_model = UNet(T=1000, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=4, dropout=0.5)
 
-    score_model = nn.DataParallel(Model(device, beta_1, beta_T, T))
-    score_model = score_model.to(device)
-    process = DiffusionProcess(beta_1, beta_T, T, score_model, device, shape)
-    optim = torch.optim.Adam(score_model.parameters(), lr = 0.0001)
-
-    total_iteration = 100
-    current_iteration = 0
-
-    train_stft = Stft_dataset(train_x, train_y)
-
-    dataloader = torch.utils.data.DataLoader(train_stft, batch_size = 32, drop_last = True, num_workers = 0)
-    dataiterator = iter(dataloader)
-
-    losses = AverageMeter('Loss', ':.4f')
-    progress = ProgressMeter(total_iteration, [losses], prefix='Iteration ')
-    pbar = tqdm(range(total_iteration))
+    optim = torch.optim.Adam(net_model.parameters(), lr=2e-4)
     
-    for epoch in pbar:
-        losses = []
-        num_items = 0
-        
-        for x, y in dataloader:
-            data = x.to(device = device)
-            loss = loss_fn(score_model, x, idx=None)
+    trainer = GaussianDiffusionTrainer(net_model, 1e-4, 0.02, 500).cuda()
+    trainer = torch.nn.DataParallel(trainer)
 
-            optim.zero_grad()
-            loss.backward()
-            optim.step()
-            
-            losses.append(loss.item())
-            num_items += x.shape[0]
-        pbar.set_description("Average loss : {}".format(sum(losses) / num_items))
-    return score_model
+    # start training
+    with tqdm(range(500), dynamic_ncols=True) as pbar:
+        for step in pbar:
+            losses = []
+            num_items = 0
+
+            # train
+            for x, y in dataloader:
+                optim.zero_grad()
+                x = x.cuda()
+                loss = trainer(x).mean()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(net_model.parameters(), 1)
+                optim.step()
+
+                losses.append(loss.item())
+                num_items += x.shape[0]
+            pbar.set_description("Average Loss : {}".format(sum(losses) / num_items))
+    return net_model
