@@ -78,18 +78,16 @@ def make_valid_test_dataset(val_sub, test_sub):
     
     return valid_x, valid_y, test_x, test_y
 
-def sampling(model, sample_number):
-    beta_1 = 1e-4
-    beta_T = 0.02
-    T = 500
-    shape = (44, 126, 16)
-    device = torch.device('cuda')
-    
-    process = DiffusionProcess(beta_1, beta_T, T, model, device, shape)
-    sample = process.sampling(sample_number, only_final=True)
-    
-    print("Generated samples shape : ", sample.shape)
-    return sample
+def sampling(sampler, model, num_images=32):
+    model.eval()
+    with torch.no_grad():
+        images = []
+        for i in tqdm(range(int(num_images/32))):
+            x_T = torch.randn((32, 44, 126, 16))
+            batch_images = sampler(x_T.cuda()).cpu()
+            images.append((batch_images + 1) / 2)
+        samples = torch.cat(images, dim=0).numpy()
+    return samples
 
 def train_scorenet_by_label(train_sub):
     train_x0, train_y0 = make_train_dataset(train_sub, 0)
@@ -105,11 +103,18 @@ def train_scorenet_by_label(train_sub):
     score_model3 = train_scorenet(train_x3, train_y3)
     return score_model0, score_model1, score_model2, score_model3
 
-def augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
-    samples0 = sampling(score_model0, sample_number=batch_size)
-    samples1 = sampling(score_model1, sample_number=batch_size)
-    samples2 = sampling(score_model2, sample_number=batch_size)
-    samples3 = sampling(score_model3, sample_number=batch_size)
+def augment(train_sub, model0, model1, model2, model3, batch_size=32):
+    sampler0 = nn.DataParallel(GaussianDiffusionSampler(model0).cuda())
+    samples0 = sampling(sampler0, model0, num_images=batch_size)
+    
+    sampler1 = nn.DataParallel(GaussianDiffusionSampler(model1).cuda())
+    samples1 = sampling(sampler1, model1, num_images=batch_size)
+    
+    sampler2 = nn.DataParallel(GaussianDiffusionSampler(model2).cuda())
+    samples2 = sampling(sampler2, model2, num_images=batch_size)
+
+    sampler3 = nn.DataParallel(GaussianDiffusionSampler(model3).cuda())
+    samples3 = sampling(sampler3, model3, num_images=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
     generated_signal0y = [0.0 for i in range(len(generated_signal0))]
@@ -123,6 +128,8 @@ def augment(train_sub, score_model0, score_model1, score_model2, score_model3, b
     generated_signal3 = return_to_signal(samples3)
     generated_signal3y = [3.0 for i in range(len(generated_signal3))]
     print("generated signal length : ", len(generated_signal0)*4)
+
+
 
     BCIC_dataset = load_BCIC(
     train_sub=train_sub,
@@ -159,8 +166,8 @@ def return_to_signal(sample):
     generated_signal = []
     for batch in range(sample.shape[0]): # batch size
         sliced_sample = sample[batch]
-        generated_stft_real = sliced_sample[:22].cpu() # real stft channel
-        generated_stft_imag = sliced_sample[22:].cpu() # imaginary stft channel
+        generated_stft_real = sliced_sample[:22] # real stft channel
+        generated_stft_imag = sliced_sample[22:] # imaginary stft channel
         for idx, imag in enumerate(generated_stft_imag): 
             generated_stft_imag[idx] = np.multiply(imag, complex(0,1))
         generated_stft = np.add(generated_stft_real, generated_stft_imag)
@@ -214,6 +221,9 @@ def main(train_sub, val_sub, test_sub):
     train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
     train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
     train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=1024)
+    train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=2048)
+
 
 def train_without_aug(train_sub, val_sub, test_sub):
     train_x, train_y = make_classifier_train_dataset(train_sub)
@@ -234,6 +244,5 @@ if __name__ == "__main__":
     train_sub = [1,2,3,4,5,6,7,8]
     val_sub = [9]
     test_sub = [9]
-
     main(train_sub, val_sub, test_sub)
     train_without_aug(train_sub, val_sub, test_sub)

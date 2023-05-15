@@ -8,15 +8,7 @@ from scipy import signal
 
 import numpy as np
 import torch
-import torch
-import torch.nn as nn
-import numpy as np
 
-import torch
-import functools
-from torch.optim import Adam, lr_scheduler
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 from tqdm import tqdm
 import scipy
 from models import *
@@ -55,8 +47,9 @@ class Stft_dataset(Dataset):
         return torch.tensor(self.x[idx], dtype=torch.float32), self.y[idx]
     
 def train_scorenet(train_x, train_y):
-    
+    # dataset
     train_stft = Stft_dataset(train_x, train_y)
+    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=0, drop_last=True)
 
     beta_1 = 1e-4
     beta_T = 0.02
@@ -86,8 +79,8 @@ def train_scorenet(train_x, train_y):
             optim.zero_grad()
             loss.backward()
             optim.step()
-            
+
             losses.append(loss.item())
             num_items += x.shape[0]
-        pbar.set_description("Average loss : {}".format(sum(losses) / num_items))
+        pbar.set_description("Average Loss : {}".format(sum(losses) / num_items))
     return score_model
