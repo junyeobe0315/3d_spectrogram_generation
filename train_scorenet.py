@@ -46,7 +46,7 @@ class Stft_dataset(Dataset):
     def __getitem__(self, idx):
         return torch.tensor(self.x[idx], dtype=torch.float32), self.y[idx]
     
-def train_scorenet(train_x, train_y):
+def train_scorenet(train_x, train_y, device):
     # dataset
     train_stft = Stft_dataset(train_x, train_y)
     dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=0, drop_last=True)
@@ -54,17 +54,15 @@ def train_scorenet(train_x, train_y):
     beta_1 = 1e-4
     beta_T = 0.02
     T = 500
-    device = torch.device('cuda')
 
-    score_model = DiffusionModel(device, beta_1, beta_T, T)
-    score_model = score_model.to(device)
+    score_model = DiffusionModel(device, beta_1, beta_T, T).to(device)
     optim = torch.optim.Adam(score_model.parameters(), lr = 0.0001)
 
     total_iteration = 1
 
     train_stft = Stft_dataset(train_x, train_y)
 
-    dataloader = torch.utils.data.DataLoader(train_stft, batch_size = 32, drop_last = True, num_workers = 0)
+    dataloader = torch.utils.data.DataLoader(train_stft, batch_size = 16, drop_last = True, num_workers = 0)
 
     pbar = tqdm(range(total_iteration))
     
@@ -74,7 +72,7 @@ def train_scorenet(train_x, train_y):
         
         for x, y in dataloader:
             data = x.to(device = device)
-            loss = loss_fn(score_model, data, idx=None)
+            loss = loss_fn(score_model, data)
 
             optim.zero_grad()
             loss.backward()
