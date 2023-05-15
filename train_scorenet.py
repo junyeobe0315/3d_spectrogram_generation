@@ -40,6 +40,7 @@ def make_train_dataset(train_sub, y_num):
     for idx, x in enumerate(train_x):
         f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
         data = np.concatenate((stft.real, stft.imag), axis=0)
+        data /= 10
         train.append(data)
     return train, ys
 
@@ -60,24 +61,18 @@ def train_scorenet(train_x, train_y):
     beta_1 = 1e-4
     beta_T = 0.02
     T = 500
-    shape = (44, 126, 16)
     device = torch.device('cuda')
 
-    score_model = nn.DataParallel(Model(device, beta_1, beta_T, T))
+    score_model = DiffusionModel(device, beta_1, beta_T, T)
     score_model = score_model.to(device)
-    process = DiffusionProcess(beta_1, beta_T, T, score_model, device, shape)
     optim = torch.optim.Adam(score_model.parameters(), lr = 0.0001)
 
-    total_iteration = 100
-    current_iteration = 0
+    total_iteration = 1
 
     train_stft = Stft_dataset(train_x, train_y)
 
     dataloader = torch.utils.data.DataLoader(train_stft, batch_size = 32, drop_last = True, num_workers = 0)
-    dataiterator = iter(dataloader)
 
-    losses = AverageMeter('Loss', ':.4f')
-    progress = ProgressMeter(total_iteration, [losses], prefix='Iteration ')
     pbar = tqdm(range(total_iteration))
     
     for epoch in pbar:
@@ -86,7 +81,7 @@ def train_scorenet(train_x, train_y):
         
         for x, y in dataloader:
             data = x.to(device = device)
-            loss = loss_fn(score_model, x, idx=None)
+            loss = loss_fn(score_model, data, idx=None)
 
             optim.zero_grad()
             loss.backward()

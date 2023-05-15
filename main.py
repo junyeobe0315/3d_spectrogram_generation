@@ -29,6 +29,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import Normalizer
 
+import tensorflow as tf
 
 from braindecode.datasets import create_from_X_y
 from braindecode import EEGClassifier
@@ -170,62 +171,41 @@ def return_to_signal(sample):
     return generated_signal
 
 
-class stft_dataset(Dataset):
+class ATC_dataset(Dataset):
     def __init__(self, x, y):
         self.x = x
         self.y = y
     def __len__(self):
         return len(self.x)
     def __getitem__(self, idx):
-        return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32)
+        y = torch.eye(4)
+        return np.array(self.x[idx]), np.array(y[int(self.y[idx])])
+
+    def get_dataset(self):
+        X = []
+        Y = []
+        for i in range(ATC_dataset.__len__(self)):
+            x, y = ATC_dataset.__getitem__(self, i)
+            x = x.reshape(1,22,1875)
+            y = y.reshape(4)
+            X.append(x)
+            Y.append(y)
+        return np.array(X).reshape(-1, 1, 22, 1875), np.array(Y).reshape(-1, 4)
 
 def train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
     train_x, train_y = augment(train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
     
-    train_set = stft_dataset(train_x, train_y)
+    train_set = ATC_dataset(train_x, train_y)
 
     valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
 
-    valid_set = stft_dataset(valid_x, valid_y)
-    test_set = stft_dataset(test_x, test_y)
+    valid_set = ATC_dataset(valid_x, valid_y)
+    test_set = ATC_dataset(test_x, test_y)
 
-    n_classes = 4
-    print(train_set.__getitem__(0)[0].shape)
-    n_channels = train_set.__getitem__(0)[0].shape[0]
-    input_window_samples = train_set.__getitem__(0)[0].shape[1]
-    device = torch.device("cuda")
+    X_train, y_train_onehot = train_set.get_dataset()
+    X_test, y_test_onehot = valid_set.get_dataset()
 
-    model = EEGNetv4(
-    n_channels,
-    n_classes,
-    input_window_samples=input_window_samples,
-    ).cuda()
-
-    lr = 0.0625 * 0.01
-    weight_decay = 0
-
-    # For deep4 they should be:
-    # lr = 1 * 0.01
-    # weight_decay = 0.5 * 0.001
-
-    batch_size = 64
-    n_epochs = 50
-    
-    clf = EEGClassifier(
-    model,
-    criterion=torch.nn.NLLLoss,
-    optimizer=torch.optim.AdamW,
-    train_split=predefined_split(valid_set),  # using valid_set for validation
-    optimizer__lr=lr,
-    optimizer__weight_decay=weight_decay,
-    batch_size=batch_size,
-    callbacks=[
-        "accuracy", ("lr_scheduler", LRScheduler('CosineAnnealingLR', T_max=n_epochs - 1)),
-    ],
-    device=device,
-    )
-
-    clf.fit(train_set, y=None, epochs=n_epochs)
+    train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot)
 
 def main(train_sub, val_sub, test_sub):
     score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub)
@@ -235,50 +215,17 @@ def main(train_sub, val_sub, test_sub):
     train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
     train_with_aug(train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
 
-def train_witout_aug(train_sub, val_sub, test_sub):
+def train_without_aug(train_sub, val_sub, test_sub):
     train_x, train_y = make_classifier_train_dataset(train_sub)
     valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
 
-    train_set = stft_dataset(train_x, train_y)
-    valid_set = stft_dataset(valid_x, valid_y)
-    test_set = stft_dataset(test_x, test_y)
+    train_set = ATC_dataset(train_x, train_y)
+    valid_set = ATC_dataset(valid_x, valid_y)
 
-    n_classes = 4
-    print(train_set.__getitem__(0)[0].shape)
-    n_channels = train_set.__getitem__(0)[0].shape[0]
-    input_window_samples = train_set.__getitem__(0)[0].shape[1]
+    X_train, y_train_onehot = train_set.get_dataset()
+    X_test, y_test_onehot = valid_set.get_dataset()
 
-    model = EEGNetv4(
-    n_channels,
-    n_classes,
-    input_window_samples=input_window_samples,
-    ).cuda()
-
-    lr = 0.0625 * 0.01
-    weight_decay = 0
-
-    # For deep4 they should be:
-    # lr = 1 * 0.01
-    # weight_decay = 0.5 * 0.001
-
-    batch_size = 64
-    n_epochs = 50
-
-    clf = EEGClassifier(
-    model,
-    criterion=torch.nn.NLLLoss,
-    optimizer=torch.optim.AdamW,
-    train_split=predefined_split(valid_set),  # using valid_set for validation
-    optimizer__lr=lr,
-    optimizer__weight_decay=weight_decay,
-    batch_size=batch_size,
-    callbacks=[
-        "accuracy", ("lr_scheduler", LRScheduler('CosineAnnealingLR', T_max=n_epochs - 1)),
-    ],
-    device=device,
-    )
-
-    clf.fit(train_set, y=None, epochs=n_epochs)
+    train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot)
 
 if __name__ == "__main__":
 
@@ -289,4 +236,4 @@ if __name__ == "__main__":
     test_sub = [9]
 
     main(train_sub, val_sub, test_sub)
-    train_witout_aug(train_sub, val_sub, test_sub)
+    train_without_aug(train_sub, val_sub, test_sub)
