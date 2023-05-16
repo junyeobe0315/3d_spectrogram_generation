@@ -26,7 +26,8 @@ import torch
 import functools
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
+
 
 import tensorflow as tf
 
@@ -38,45 +39,25 @@ import scipy
 
 from atcnet import *
 
-def make_classifier_train_dataset(train_sub):
+def make_classifier_dataset(train_sub, val_sub, test_sub):
     BCIC_dataset = load_BCIC(
     train_sub=train_sub,
-    test_sub=[],
-    alg_name = 'Tensor_CSPNet',
-    scenario = 'raw-signal-si'
-    )
-
-    train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
-    
-    normalizer = Normalizer()
-    for idx, x in enumerate(train_x):
-        normalizer.fit(x)
-        train_x[idx] = normalizer.transform(x)
-
-    return train_x, train_y
-
-def make_valid_test_dataset(val_sub, test_sub):
-    BCIC_dataset = load_BCIC(
-    train_sub=[],
     valid_sub=val_sub,
     test_sub=test_sub,
     alg_name = 'Tensor_CSPNet',
     scenario = 'raw-signal-si'
     )
 
-    train_x, train_y, valid_x, valid_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
+    train_x, train_y, val_x, val_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
     
-    normalizer = Normalizer()
-    for idx, x in enumerate(valid_x):
-        normalizer.fit(x)
-        valid_x[idx] = normalizer.transform(x)
-    
-    normalizer = Normalizer()
-    for idx, x in enumerate(test_x):
-        normalizer.fit(x)
-        test_x[idx] = normalizer.transform(x)
-    
-    return valid_x, valid_y, test_x, test_y
+    for channel in range(22):
+        scaler = StandardScaler()
+        scaler.fit(train_x[:,channel,:])
+        train_x[:,channel,:] = scaler.transform(train_x[:,channel,:])
+        val_x[:,channel,:] = scaler.transform(val_x[:,channel,:])
+        test_x[:,channel,:] = scaler.transform(test_x[:,channel,:])
+
+    return train_x, train_y, val_x, val_y, test_x, test_y
 
 def sample(sampler, model, num_images=32):
     model.eval()
@@ -149,7 +130,7 @@ def augment(device, train_sub, model0, model1, model2, model3, batch_size=32):
     train_x.extend(generated_signal2)
     train_x.extend(generated_signal3)
 
-    normalizer = Normalizer()
+    normalizer = StandardScaler()
     for idx, x in enumerate(train_x):
         normalizer.fit(x)
         train_x[idx] = normalizer.transform(x)
@@ -187,7 +168,7 @@ class ATC_dataset(Dataset):
         return len(self.x)
     def __getitem__(self, idx):
         y = torch.eye(4)
-        return np.array(self.x[idx][:,625:1750]), np.array(y[int(self.y[idx])])
+        return np.array(self.x[idx][:,375:1500]), np.array(y[int(self.y[idx])])
 
     def get_dataset(self):
         X = []
@@ -205,7 +186,7 @@ def train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_mod
     
     train_set = ATC_dataset(train_x, train_y)
 
-    valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
+    _, _, valid_x, valid_y, test_x, test_y = make_classifier_dataset(train_sub, val_sub, test_sub)
 
     valid_set = ATC_dataset(valid_x, valid_y)
     test_set = ATC_dataset(test_x, test_y)
@@ -227,8 +208,7 @@ def main(train_sub, val_sub, test_sub, device):
 
 
 def train_without_aug(train_sub, val_sub, test_sub):
-    train_x, train_y = make_classifier_train_dataset(train_sub)
-    valid_x, valid_y, test_x, test_y = make_valid_test_dataset(val_sub, test_sub)
+    train_x, train_y, valid_x, valid_y, _,_ = make_classifier_dataset(train_sub, val_sub, test_sub)
 
     train_set = ATC_dataset(train_x, train_y)
     valid_set = ATC_dataset(valid_x, valid_y)
