@@ -156,6 +156,10 @@ def return_to_signal(sample):
         t, sig = scipy.signal.istft(generated_stft, fs=250, nperseg=250)
         generated_signal.append(sig)
     generated_signal = np.array(generated_signal)
+    for channel in range(22):
+        scaler = StandardScaler()
+        scaler.fit(generated_signal[:,channel,:])
+        generated_signal[:,channel,:] = scaler.transform(generated_signal[:,channel,:])
     print("Generated signal shape : ", generated_signal.shape)
     return generated_signal
 
