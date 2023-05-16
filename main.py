@@ -1,5 +1,4 @@
 from train_scorenet import *
-from samplers import *
 from skorch.helper import predefined_split
 from skorch.callbacks import LRScheduler
 
@@ -35,7 +34,6 @@ from braindecode.datasets import create_from_X_y
 from braindecode import EEGClassifier
 from braindecode.models import ShallowFBCSPNet, EEGITNet, EEGNetv4
 from braindecode.augmentation import AugmentedDataLoader
-from samplers import *
 import scipy
 
 from atcnet import *
@@ -244,15 +242,75 @@ if __name__ == "__main__":
 
     device = torch.device("cuda")
 
-    train_sub = [1,2,3,4,5,6,7,8]
-    val_sub = [9]
-    test_sub = [9]
-    main(train_sub, val_sub, test_sub, device)
-    train_without_aug(train_sub, val_sub, test_sub)
+    if device == torch.device("cuda:0"):
+        train_sub = [1,2,3,4,5,6,7,8]
+        val_sub = [9]
+        test_sub = [9]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
 
 
-    train_sub = [1,2,3,4,5,6,7,9]
-    val_sub = [8]
-    test_sub = [8]
-    main(train_sub, val_sub, test_sub, device)
-    train_without_aug(train_sub, val_sub, test_sub)
+        train_sub = [1,2,3,4,5,6,7,9]
+        val_sub = [8]
+        test_sub = [8]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+    if device == torch.device("cuda:0"):
+        train_sub = [1,2,3,4,5,6,7,8]
+        val_sub = [9]
+        test_sub = [9]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+
+        train_sub = [1,2,3,4,5,6,7,9]
+        val_sub = [8]
+        test_sub = [8]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+    if device == torch.device("cuda:1"):
+        train_sub = [1,2,3,4,5,6,8,9]
+        val_sub = [7]
+        test_sub = [7]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+
+        train_sub = [1,2,3,4,5,7,8,9]
+        val_sub = [6]
+        test_sub = [6]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+    if device == torch.device("cuda:2"):
+        train_sub = [1,2,3,4,6,7,8,9]
+        val_sub = [5]
+        test_sub = [5]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+
+        train_sub = [1,2,3,5,6,7,8,9]
+        val_sub = [4]
+        test_sub = [4]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+    if device == torch.device("cuda:3"):
+        train_sub = [1,2,4,5,6,7,8,9]
+        val_sub = [3]
+        test_sub = [3]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+
+        train_sub = [1,3,4,5,6,7,8,9]
+        val_sub = [2]
+        test_sub = [2]
+        main(train_sub, val_sub, test_sub, device)
+        train_without_aug(train_sub, val_sub, test_sub)
+
+
+

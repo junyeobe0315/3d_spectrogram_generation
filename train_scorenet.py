@@ -32,7 +32,7 @@ def make_train_dataset(train_sub, y_num):
     for idx, x in enumerate(train_x):
         f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
         data = np.concatenate((stft.real, stft.imag), axis=0)
-        data /= 10
+        data /= 20
         train.append(data)
     return train, ys
 

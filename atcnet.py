@@ -238,8 +238,8 @@ from tensorflow.keras.layers import Add, Concatenate, Lambda, Input, Permute
 from tensorflow.keras.constraints import max_norm
 
 
-def ATCNet(n_classes, in_chans = 22, in_samples = 1125, n_windows = 3, attention = None, 
-           eegn_F1 = 16, eegn_D = 2, eegn_kernelSize = 64, eegn_poolSize = 8, eegn_dropout=0.3, 
+def ATCNet(n_classes, in_chans = 22, in_samples = 1125, n_windows = 5, attention = 'mha', 
+           eegn_F1 = 16, eegn_D = 2, eegn_kernelSize = 64, eegn_poolSize = 7, eegn_dropout=0.3, 
            tcn_depth = 2, tcn_kernelSize = 4, tcn_filters = 32, tcn_dropout = 0.3, 
            tcn_activation = 'elu', fuse = 'average'):
     """ ATCNet model from Altaheri et al 2022.
@@ -394,16 +394,17 @@ import time
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import categorical_crossentropy
 from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.metrics import cohen_kappa_score
 
 def train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot):
     # Get the current 'IN' time to calculate the overall training time
     in_exp = time.time()
     
-    batch_size = 4
-    epochs = 100
-    lr = 1e-3
-    n_train = 2
+    batch_size = 64
+    epochs = 1000
+    lr = 0.0009
+    n_train = 10
     model = ATCNet(n_classes=4, in_chans=22)
 
     # Initialize variables
@@ -414,11 +415,17 @@ def train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot):
     for train in range(n_train): # How many repetitions of training for subject i.
         # Get the current 'IN' time to calculate the 'run' training time
         in_run = time.time()
-        
+                
+        callbacks = [
+            ModelCheckpoint(monitor='val_accuracy', filepath='ATCNEt_test_3.h5',verbose=0, save_best_only=True, save_weight_only=True),
+            EarlyStopping(monitor='val_accuracy', verbose=0, mode='max', patience=300),
+        ]
+
         # Compile and train the model
         model.compile(loss=categorical_crossentropy, optimizer=Adam(learning_rate=lr), metrics=['accuracy'])          
         history = model.fit(X_train, y_train_onehot, validation_data=(X_test, y_test_onehot), 
-                            epochs=epochs, batch_size=batch_size)
+                            epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+        print("Max test Acc : ",max(history.history['val_accuracy']))
 
         # Evaluate the performance of the trained model. 
         # Here we load the Trained weights from the file saved in the hard 

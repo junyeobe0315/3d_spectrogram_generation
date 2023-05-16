@@ -334,7 +334,7 @@ class DiffusionProcess():
             final = sample
             if not only_final:
                 sampling_list.append(final)
-        final *= 10
+        final *= 20
         return final if only_final else torch.stack(sampling_list)
 
 
