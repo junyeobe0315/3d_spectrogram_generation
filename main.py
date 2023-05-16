@@ -189,18 +189,18 @@ class ATC_dataset(Dataset):
         return len(self.x)
     def __getitem__(self, idx):
         y = torch.eye(4)
-        return np.array(self.x[idx]), np.array(y[int(self.y[idx])])
+        return np.array(self.x[idx][:,625:1750]), np.array(y[int(self.y[idx])])
 
     def get_dataset(self):
         X = []
         Y = []
         for i in range(ATC_dataset.__len__(self)):
             x, y = ATC_dataset.__getitem__(self, i)
-            x = x.reshape(1,22,1875)
+            x = x.reshape(1,22,1125)
             y = y.reshape(4)
             X.append(x)
             Y.append(y)
-        return np.array(X).reshape(-1, 1, 22, 1875), np.array(Y).reshape(-1, 4)
+        return np.array(X).reshape(-1, 1, 22, 1125), np.array(Y).reshape(-1, 4)
 
 def train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
     train_x, train_y = augment(device, train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
@@ -248,10 +248,11 @@ if __name__ == "__main__":
     val_sub = [9]
     test_sub = [9]
     main(train_sub, val_sub, test_sub, device)
+    train_without_aug(train_sub, val_sub, test_sub)
+
 
     train_sub = [1,2,3,4,5,6,7,9]
     val_sub = [8]
     test_sub = [8]
     main(train_sub, val_sub, test_sub, device)
-
     train_without_aug(train_sub, val_sub, test_sub)

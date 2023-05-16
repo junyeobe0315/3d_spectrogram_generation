@@ -238,7 +238,7 @@ from tensorflow.keras.layers import Add, Concatenate, Lambda, Input, Permute
 from tensorflow.keras.constraints import max_norm
 
 
-def ATCNet(n_classes, in_chans = 22, in_samples = 1875, n_windows = 3, attention = None, 
+def ATCNet(n_classes, in_chans = 22, in_samples = 1125, n_windows = 3, attention = None, 
            eegn_F1 = 16, eegn_D = 2, eegn_kernelSize = 64, eegn_poolSize = 8, eegn_dropout=0.3, 
            tcn_depth = 2, tcn_kernelSize = 4, tcn_filters = 32, tcn_dropout = 0.3, 
            tcn_activation = 'elu', fuse = 'average'):
@@ -400,7 +400,7 @@ def train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot):
     # Get the current 'IN' time to calculate the overall training time
     in_exp = time.time()
     
-    batch_size = 8
+    batch_size = 4
     epochs = 100
     lr = 1e-3
     n_train = 2
