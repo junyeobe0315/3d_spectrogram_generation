@@ -1,43 +1,13 @@
-from train_scorenet import *
-from skorch.helper import predefined_split
-from skorch.callbacks import LRScheduler
-
-from typing import Callable
-
-from torch.utils.data import DataLoader, Dataset
 import torch
-
-from utils.load_data import *
+import scipy
 import numpy as np
-from scipy import signal
-
-import os
-import numpy as np
-import torch
-import torchvision
-import json
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import random
-
-import torch
-import functools
-from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 from sklearn.preprocessing import StandardScaler
 
-
-import tensorflow as tf
-
-from braindecode.datasets import create_from_X_y
-from braindecode import EEGClassifier
-from braindecode.models import ShallowFBCSPNet, EEGITNet, EEGNetv4
-from braindecode.augmentation import AugmentedDataLoader
-import scipy
-
+from train_scorenet import *
+from utils.load_data import *
 from atcnet import *
+
 
 def make_classifier_dataset(train_sub, val_sub, test_sub):
     BCIC_dataset = load_BCIC(
@@ -59,44 +29,28 @@ def make_classifier_dataset(train_sub, val_sub, test_sub):
 
     return train_x, train_y, val_x, val_y, test_x, test_y
 
-def sample(sampler, model, num_images=32):
-    model.eval()
+def sample(sampler, label, device, num_images=32):
+    label = torch.tensor(int(label), dtype=torch.int).to(device)
     with torch.no_grad():
         images = []
-        for i in tqdm(range(int(num_images))):
-            x_T = torch.randn((1, 44, 126, 16))
-            batch_images = sampler(x_T.cuda()).cpu()
+        for i in tqdm(range(int(num_images/32))):
+            batch_images = sampler.sampling(sampling_number=32, label=label, only_final=True).cpu()
             images.append((batch_images + 1) / 2)
-        samples = torch.cat(images, dim=0).numpy()
+        samples = torch.cat(images, dim=0)
     return samples
 
 def train_scorenet_by_label(train_sub, device):
-    train_x0, train_y0 = make_train_dataset(train_sub, 0)
-    score_model0 = train_scorenet(train_x0, train_y0, device)
+    train_x, train_y = make_train_dataset(train_sub, [0,1,2,3])
+    score_model = train_scorenet(train_x, train_y, device)
+    return score_model
 
-    train_x1, train_y1 = make_train_dataset(train_sub, 1)
-    score_model1 = train_scorenet(train_x1, train_y1, device)
-
-    train_x2, train_y2 = make_train_dataset(train_sub, 2)
-    score_model2 = train_scorenet(train_x2, train_y2, device)
-
-    train_x3, train_y3 = make_train_dataset(train_sub, 3)
-    score_model3 = train_scorenet(train_x3, train_y3, device)
-    return score_model0, score_model1, score_model2, score_model3
-
-def augment(device, train_sub, model0, model1, model2, model3, batch_size=32):
+def augment(device, train_sub, model, batch_size=32):
     
-    sampler0 = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model0, device=device, shape=(44, 126, 16))
-    samples0 = sampler0.sampling(sampling_number=batch_size, only_final=True)
-    
-    sampler1 = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model1, device=device, shape=(44, 126, 16))
-    samples1 = sampler1.sampling(sampling_number=batch_size, only_final=True)
-    
-    sampler2 = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model2, device=device, shape=(44, 126, 16))
-    samples2 = sampler2.sampling(sampling_number=batch_size, only_final=True)
-
-    sampler3 = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model3, device=device, shape=(44, 126, 16))
-    samples3 = sampler3.sampling(sampling_number=batch_size, only_final=True)
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model, device=device, shape=(44, 188, 4))
+    samples0 = sample(sampler, label=0, device=device, num_images=batch_size)
+    samples1 = sample(sampler, label=1, device=device, num_images=batch_size)
+    samples2 = sample(sampler, label=2, device=device, num_images=batch_size)
+    samples3 = sample(sampler, label=3, device=device, num_images=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
     generated_signal0y = [0.0 for i in range(len(generated_signal0))]
@@ -129,32 +83,25 @@ def augment(device, train_sub, model0, model1, model2, model3, batch_size=32):
     train_x.extend(generated_signal1)
     train_x.extend(generated_signal2)
     train_x.extend(generated_signal3)
-
-    normalizer = StandardScaler()
-    for idx, x in enumerate(train_x):
-        normalizer.fit(x)
-        train_x[idx] = normalizer.transform(x)
-        
     
     train_y.extend(generated_signal0y)
     train_y.extend(generated_signal1y)
     train_y.extend(generated_signal2y)
     train_y.extend(generated_signal3y)
-    
-    return train_x, train_y
 
+    return train_x, train_y
 
 def return_to_signal(sample):
     generated_signal = []
     for batch in range(sample.shape[0]): # batch size
         sliced_sample = sample[batch]
-        generated_stft_real = sliced_sample[:22].cpu() # real stft channel
-        generated_stft_imag = sliced_sample[22:].cpu() # imaginary stft channel
+        generated_stft_real = sliced_sample[:22] # real stft channel
+        generated_stft_imag = sliced_sample[22:] # imaginary stft channel
         for idx, imag in enumerate(generated_stft_imag): 
             generated_stft_imag[idx] = np.multiply(imag, complex(0,1))
         generated_stft = np.add(generated_stft_real, generated_stft_imag)
-        t, sig = scipy.signal.istft(generated_stft, fs=250, nperseg=250)
-        generated_signal.append(sig)
+        t, sig = scipy.signal.istft(generated_stft, fs=250, nperseg=375, noverlap=0)
+        generated_signal.append(sig[:1125])
     generated_signal = np.array(generated_signal)
     for channel in range(22):
         scaler = StandardScaler()
@@ -172,21 +119,22 @@ class ATC_dataset(Dataset):
         return len(self.x)
     def __getitem__(self, idx):
         y = torch.eye(4)
-        return np.array(self.x[idx][:,375:1500]), np.array(y[int(self.y[idx])])
+        return np.array(self.x[idx]), np.array(y[int(self.y[idx])])
 
     def get_dataset(self):
         X = []
         Y = []
         for i in range(ATC_dataset.__len__(self)):
             x, y = ATC_dataset.__getitem__(self, i)
-            x = x.reshape(1,22,1125)
+            x = x.reshape(1,22,-1)
+            x = x[:,:,:1125]
             y = y.reshape(4)
             X.append(x)
             Y.append(y)
         return np.array(X).reshape(-1, 1, 22, 1125), np.array(Y).reshape(-1, 4)
 
-def train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32):
-    train_x, train_y = augment(device, train_sub, score_model0, score_model1, score_model2, score_model3, batch_size=batch_size)
+def train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size):
+    train_x, train_y = augment(device, train_sub, score_model, batch_size=batch_size)
     
     train_set = ATC_dataset(train_x, train_y)
 
@@ -201,14 +149,13 @@ def train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_mod
     train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot)
 
 def main(train_sub, val_sub, test_sub, device):
-    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub, device)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=32)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=1024)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=2048)
+    score_model = train_scorenet_by_label(train_sub, device)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=64)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=128)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=256)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=512)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=1024)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=2048)
 
 
 def train_without_aug(train_sub, val_sub, test_sub):

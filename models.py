@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.nn import init
 from torch.nn import functional as F
-
+import numpy as np
 
 class Swish(nn.Module):
     def forward(self, x):
@@ -159,7 +159,7 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, T, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=2, dropout=0.1):
+    def __init__(self, T, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=2, dropout=0.1, num_classes=4):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
@@ -203,6 +203,11 @@ class UNet(nn.Module):
             nn.GELU(),
             nn.Conv2d(now_ch, 44, 3, stride=1, padding=1)
         )
+
+        if num_classes is not None:
+            self.label_embedding = nn.Embedding(num_classes, tdim)
+
+
         self.initialize()
 
     def initialize(self):
@@ -211,9 +216,11 @@ class UNet(nn.Module):
         init.xavier_uniform_(self.tail[-1].weight, gain=1e-5)
         init.zeros_(self.tail[-1].bias)
 
-    def forward(self, x, t):
+    def forward(self, x, t, y):
         # Timestep embedding
         temb = self.time_embedding(t)
+        if y is not None:
+            temb += self.label_embedding(y)
         # Downsampling
         h = self.head(x)
         hs = [h]
@@ -258,7 +265,7 @@ class DiffusionModel(nn.Module):
         
         self.to(device = self.device)
         
-    def forward(self, x, idx=None, get_target=False):
+    def forward(self, x, idx=None, y=None, get_target=False):
         if idx == None:
             idx = torch.randint(0, len(self.alpha_bars), (x.size(0), )).to(device = self.device)
             used_alpha_bars = self.alpha_bars[idx][:, None, None, None].to(device = self.device)
@@ -269,11 +276,11 @@ class DiffusionModel(nn.Module):
             idx = torch.Tensor([idx for _ in range(x.size(0))]).to(device = self.device).long()
             x_tilde = x
         
-        output = self.backbone(x_tilde, idx)
+        output = self.backbone(x_tilde, idx, y)
         
         return (output, epsilon, used_alpha_bars) if get_target else output
 
-def loss_fn(model, x, idx=None):
+def loss_fn(model, x, idx=None, y=None):
     '''
     This function performed when only training phase.
 
@@ -281,7 +288,7 @@ def loss_fn(model, x, idx=None):
     idx        : if None (training phase), we perturbed random index. Else (inference phase), it is recommended that you specify.
 
     '''
-    output, epsilon, alpha_bar = model.forward(x, idx=idx, get_target=True)
+    output, epsilon, alpha_bar = model.forward(x, idx=idx, y=y, get_target=True)
     loss = (output - epsilon).square().mean()
     return loss
 
@@ -305,7 +312,7 @@ class DiffusionProcess():
         self.device = device
 
     
-    def _one_diffusion_step(self, x):
+    def _one_diffusion_step(self, x, label=None):
         '''
         x   : perturbated data
         '''
@@ -313,7 +320,7 @@ class DiffusionProcess():
 
             noise = torch.zeros_like(x) if idx == 0 else torch.randn_like(x)
             sqrt_tilde_beta = torch.sqrt((1 - self.alpha_prev_bars[idx]) / (1 - self.alpha_bars[idx]) * self.betas[idx])
-            predict_epsilon = self.diffusion_fn(x, idx)
+            predict_epsilon = self.diffusion_fn(x, idx, label)
             mu_theta_xt = torch.sqrt(1 / self.alphas[idx]) * (x - self.betas[idx] / torch.sqrt(1 - self.alpha_bars[idx]) * predict_epsilon)
 
             x = mu_theta_xt + sqrt_tilde_beta * noise
@@ -321,7 +328,7 @@ class DiffusionProcess():
             yield x
     
     @torch.no_grad()
-    def sampling(self, sampling_number, only_final=False):
+    def sampling(self, sampling_number, label=None, only_final=False):
         '''
         sampling_number : a number of generation
         only_final      : If True, return is an only output of final schedule step 
@@ -330,11 +337,10 @@ class DiffusionProcess():
         sampling_list = []
         
         final = None
-        for sample in self._one_diffusion_step(sample):
+        for sample in self._one_diffusion_step(sample, label):
             final = sample
             if not only_final:
                 sampling_list.append(final)
-        final *= 20
         return final if only_final else torch.stack(sampling_list)
 
 

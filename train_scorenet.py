@@ -12,7 +12,7 @@ import torch
 from tqdm import tqdm
 import scipy
 from models import *
-
+from sklearn.preprocessing import StandardScaler
 
 def make_train_dataset(train_sub, y_num):
     BCIC_dataset = load_BCIC(
@@ -23,16 +23,22 @@ def make_train_dataset(train_sub, y_num):
     )
 
     train_x, train_y, test_x, test_y = BCIC_dataset.generate_training_valid_test_set_subject_independent()
-    
+    train_X = np.zeros(shape=(train_x.shape[0], train_x.shape[1], 1125))
+
+    for channel in range(22):
+        scaler = StandardScaler()
+        scaler.fit(train_x[:,channel,:])
+        train_x[:,channel,:] = scaler.transform(train_x[:,channel,:])
+        train_X[:, channel] = train_x[:, channel, 375:1500]
+
     ys = []
-    for idx, x in enumerate(train_x):
-        if train_y[idx] == y_num:
+    for idx, x in enumerate(train_X):
+        if train_y[idx] in y_num:
             ys.append(train_y[idx])
     train = []
-    for idx, x in enumerate(train_x):
-        f, t, stft = scipy.signal.stft(x,fs=250, nperseg=250)
+    for idx, x in enumerate(train_X):
+        f, t, stft = scipy.signal.stft(x,fs=250, nperseg=375, noverlap=0)
         data = np.concatenate((stft.real, stft.imag), axis=0)
-        data /= 20
         train.append(data)
     return train, ys
 
@@ -44,7 +50,7 @@ class Stft_dataset(Dataset):
     def __len__(self):
         return len(self.y)
     def __getitem__(self, idx):
-        return torch.tensor(self.x[idx], dtype=torch.float32), self.y[idx]
+        return torch.tensor(self.x[idx], dtype=torch.float32), torch.tensor(int(self.y[idx]), dtype=torch.int)
     
 def train_scorenet(train_x, train_y, device):
     # dataset
@@ -58,11 +64,9 @@ def train_scorenet(train_x, train_y, device):
     score_model = DiffusionModel(device, beta_1, beta_T, T).to(device)
     optim = torch.optim.Adam(score_model.parameters(), lr = 0.0001)
 
-    total_iteration = 500
+    total_iteration = 1
 
     train_stft = Stft_dataset(train_x, train_y)
-
-    dataloader = torch.utils.data.DataLoader(train_stft, batch_size = 16, drop_last = True, num_workers = 0)
 
     pbar = tqdm(range(total_iteration))
     
@@ -72,7 +76,8 @@ def train_scorenet(train_x, train_y, device):
         
         for x, y in dataloader:
             data = x.to(device = device)
-            loss = loss_fn(score_model, data)
+            y = y.to(device = device)
+            loss = loss_fn(score_model, data, idx=None, y=y)
 
             optim.zero_grad()
             loss.backward()
@@ -81,4 +86,6 @@ def train_scorenet(train_x, train_y, device):
             losses.append(loss.item())
             num_items += x.shape[0]
         pbar.set_description("Average Loss : {}".format(sum(losses) / num_items))
+        if ((sum(losses) / num_items) < 5e-5):
+            break
     return score_model

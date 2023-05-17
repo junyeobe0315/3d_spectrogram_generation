@@ -404,7 +404,7 @@ def train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot):
     batch_size = 64
     epochs = 1000
     lr = 0.0009
-    n_train = 10
+    n_train = 1
     model = ATCNet(n_classes=4, in_chans=22)
 
     # Initialize variables
