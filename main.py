@@ -40,7 +40,7 @@ def sample(sampler, label, device, num_images=32):
     return samples
 
 def train_scorenet_by_label(train_sub, device):
-    train_x, train_y = make_train_dataset(train_sub, [0,1,2,3])
+    train_x, train_y = make_train_dataset(train_sub, [0.0, 1.0 ,2.0 ,3.0])
     score_model = train_scorenet(train_x, train_y, device)
     return score_model
 

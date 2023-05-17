@@ -33,7 +33,7 @@ def make_train_dataset(train_sub, y_num):
 
     ys = []
     for idx, x in enumerate(train_X):
-        if train_y[idx] in y_num:
+        if int(train_y[idx]) in y_num:
             ys.append(train_y[idx])
     train = []
     for idx, x in enumerate(train_X):
