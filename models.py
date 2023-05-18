@@ -159,13 +159,13 @@ class ResBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, T, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=2, dropout=0.1, num_classes=4):
+    def __init__(self, T, ch=128, ch_mult=[1,2,2,2], attn=[1], num_res_blocks=2, dropout=0.5, num_classes=4, in_ch=44):
         super().__init__()
         assert all([i < len(ch_mult) for i in attn]), 'attn index out of bound'
         tdim = ch * 4
         self.time_embedding = TimeEmbedding(T, ch, tdim)
 
-        self.head = nn.Conv2d(44, ch, kernel_size=3, stride=1, padding=1)
+        self.head = nn.Conv2d(in_ch, ch, kernel_size=3, stride=1, padding=1)
         self.downblocks = nn.ModuleList()
         chs = [ch]  # record output channel when dowmsample for upsample
         now_ch = ch
@@ -201,7 +201,7 @@ class UNet(nn.Module):
         self.tail = nn.Sequential(
             nn.GroupNorm(32, now_ch),
             nn.GELU(),
-            nn.Conv2d(now_ch, 44, 3, stride=1, padding=1)
+            nn.Conv2d(now_ch, in_ch, 3, stride=1, padding=1)
         )
 
         if num_classes is not None:
@@ -262,6 +262,41 @@ class DiffusionModel(nn.Module):
         self.device = device
         self.alpha_bars = torch.cumprod(1 - torch.linspace(start = beta_1, end=beta_T, steps=T), dim = 0).to(device = device)
         self.backbone = UNet(T)
+        
+        self.to(device = self.device)
+        
+    def forward(self, x, idx=None, y=None, get_target=False):
+        if idx == None:
+            idx = torch.randint(0, len(self.alpha_bars), (x.size(0), )).to(device = self.device)
+            used_alpha_bars = self.alpha_bars[idx][:, None, None, None].to(device = self.device)
+            epsilon = torch.randn_like(x).to(device = self.device)
+            x_tilde = torch.sqrt(used_alpha_bars).to(device = self.device) * x.to(device = self.device) + torch.sqrt(1 - used_alpha_bars).to(device = self.device)* epsilon.to(device = self.device)
+            
+        else:
+            idx = torch.Tensor([idx for _ in range(x.size(0))]).to(device = self.device).long()
+            x_tilde = x
+        
+        output = self.backbone(x_tilde, idx, y)
+        
+        return (output, epsilon, used_alpha_bars) if get_target else output
+
+
+class RAW_DiffusionModel(nn.Module):
+    def __init__(self, device, beta_1, beta_T, T):
+        '''
+        The epsilon predictor of diffusion process.
+
+        beta_1    : beta_1 of diffusion process
+        beta_T    : beta_T of diffusion process
+        T         : Diffusion Steps
+        input_dim : a dimension of data
+
+        '''
+
+        super().__init__()
+        self.device = device
+        self.alpha_bars = torch.cumprod(1 - torch.linspace(start = beta_1, end=beta_T, steps=T), dim = 0).to(device = device)
+        self.backbone = UNet(T, in_ch=1)
         
         self.to(device = self.device)
         
