@@ -40,17 +40,32 @@ def sample(sampler, label, device, num_images=32):
     return samples
 
 def train_scorenet_by_label(train_sub, device):
-    train_x, train_y = make_train_dataset(train_sub, [0.0, 1.0 ,2.0 ,3.0])
-    score_model = train_scorenet(train_x, train_y, device)
-    return score_model
-
-def augment(device, train_sub, model, batch_size=32):
+    train_x, train_y = make_train_dataset(train_sub, [0.0])
+    score_model0 = train_scorenet(train_x, train_y, device)
     
-    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model, device=device, shape=(44, 188, 4))
+    train_x, train_y = make_train_dataset(train_sub, [1.0])
+    score_model1 = train_scorenet(train_x, train_y, device)
+    
+    train_x, train_y = make_train_dataset(train_sub, [2.0])
+    score_model2 = train_scorenet(train_x, train_y, device)
+    
+    train_x, train_y = make_train_dataset(train_sub, [3.0])
+    score_model3 = train_scorenet(train_x, train_y, device)
+    return score_model0, score_model1, score_model2, score_model3
+
+def augment(device, train_sub, model0, model1, model2, model3, batch_size=32):
+    
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model0, device=device, shape=(44, 188, 4))
     samples0 = sample(sampler, label=0, device=device, num_images=batch_size)
-    samples1 = sample(sampler, label=1, device=device, num_images=batch_size)
-    samples2 = sample(sampler, label=2, device=device, num_images=batch_size)
-    samples3 = sample(sampler, label=3, device=device, num_images=batch_size)
+
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model1, device=device, shape=(44, 188, 4))
+    samples1 = sample(sampler, label=0, device=device, num_images=batch_size)
+
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model2, device=device, shape=(44, 188, 4))
+    samples2 = sample(sampler, label=0, device=device, num_images=batch_size)
+
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model3, device=device, shape=(44, 188, 4))
+    samples3 = sample(sampler, label=0, device=device, num_images=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
     generated_signal0y = [0.0 for i in range(len(generated_signal0))]
@@ -133,8 +148,8 @@ class ATC_dataset(Dataset):
             Y.append(y)
         return np.array(X).reshape(-1, 1, 22, 1125), np.array(Y).reshape(-1, 4)
 
-def train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size):
-    train_x, train_y = augment(device, train_sub, score_model, batch_size=batch_size)
+def train_with_aug(device, train_sub, val_sub, test_sub, model0, model1, model2, model3, batch_size):
+    train_x, train_y = augment(device, train_sub, model0, model1, model2, model3, batch_size=batch_size)
     
     train_set = ATC_dataset(train_x, train_y)
 
@@ -149,13 +164,13 @@ def train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size
     train_atcnet(X_train, y_train_onehot, X_test, y_test_onehot)
 
 def main(train_sub, val_sub, test_sub, device):
-    score_model = train_scorenet_by_label(train_sub, device)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=64)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=128)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=256)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=512)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=1024)
-    train_with_aug(device, train_sub, val_sub, test_sub, score_model, batch_size=2048)
+    score_model0, score_model1, score_model2, score_model3 = train_scorenet_by_label(train_sub, device)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=64)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=128)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=256)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=512)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3,batch_size=1024)
+    train_with_aug(device, train_sub, val_sub, test_sub, score_model0, score_model1, score_model2, score_model3, batch_size=2048)
 
 
 def train_without_aug(train_sub, val_sub, test_sub):
@@ -172,20 +187,6 @@ def train_without_aug(train_sub, val_sub, test_sub):
 if __name__ == "__main__":
 
     device = torch.device("cuda")
-
-    if device == torch.device("cuda:0"):
-        train_sub = [1,2,3,4,5,6,7,8]
-        val_sub = [9]
-        test_sub = [9]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub)
-
-
-        train_sub = [1,2,3,4,5,6,7,9]
-        val_sub = [8]
-        test_sub = [8]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub)
 
     if device == torch.device("cuda:0"):
         train_sub = [1,2,3,4,5,6,7,8]
