@@ -84,16 +84,16 @@ def train_raw_scorenet_by_label(train_sub, device):
 
 def augment(device, train_sub, model0, model1, model2, model3, batch_size=32):
     
-    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model0, device=device, shape=(44, 188, 4))
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=1000, diffusion_fn=model0, device=device, shape=(44, 188, 4))
     samples0 = sample(sampler, label=0, device=device, num_images=batch_size)
 
-    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model1, device=device, shape=(44, 188, 4))
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=1000, diffusion_fn=model1, device=device, shape=(44, 188, 4))
     samples1 = sample(sampler, label=0, device=device, num_images=batch_size)
 
-    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model2, device=device, shape=(44, 188, 4))
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=1000, diffusion_fn=model2, device=device, shape=(44, 188, 4))
     samples2 = sample(sampler, label=0, device=device, num_images=batch_size)
 
-    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=500, diffusion_fn=model3, device=device, shape=(44, 188, 4))
+    sampler = DiffusionProcess(beta_1=1e-4, beta_T=0.02, T=1000, diffusion_fn=model3, device=device, shape=(44, 188, 4))
     samples3 = sample(sampler, label=0, device=device, num_images=batch_size)
 
     generated_signal0 = return_to_signal(samples0)
@@ -321,60 +321,74 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     if device == torch.device("cuda:0"):
-        train_sub = [1,2,3,4,5,6,7,8]
-        val_sub = [9]
-        test_sub = [9]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [1]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model1_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model1_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model1_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model1_3.pt')
 
 
-        train_sub = [1,2,3,4,5,6,7,9]
-        val_sub = [8]
-        test_sub = [8]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [2]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model2_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model2_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model2_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model2_3.pt')
+
 
     if device == torch.device("cuda:1"):
-        train_sub = [1,2,3,4,5,6,8,9]
-        val_sub = [7]
-        test_sub = [7]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [3]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model3_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model3_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model3_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model3_3.pt')
 
+        train_sub = [4]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model4_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model4_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model4_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model4_3.pt')
 
-        train_sub = [1,2,3,4,5,7,8,9]
-        val_sub = [6]
-        test_sub = [6]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
 
     if device == torch.device("cuda:2"):
-        train_sub = [1,2,3,4,6,7,8,9]
-        val_sub = [5]
-        test_sub = [5]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [5]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model5_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model5_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model5_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model5_3.pt')
 
+        train_sub = [6]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model6_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model6_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model6_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model6_3.pt')
 
-        train_sub = [1,2,3,5,6,7,8,9]
-        val_sub = [4]
-        test_sub = [4]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
 
     if device == torch.device("cuda:3"):
-        train_sub = [1,2,4,5,6,7,8,9]
-        val_sub = [3]
-        test_sub = [3]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [7]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model7_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model7_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model7_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model7_3.pt')
 
 
-        train_sub = [1,3,4,5,6,7,8,9]
-        val_sub = [2]
-        test_sub = [2]
-        main(train_sub, val_sub, test_sub, device)
-        train_without_aug(train_sub, val_sub, test_sub, device)
+        train_sub = [8]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model8_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model8_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model8_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model8_3.pt')
 
 
-
+        train_sub = [9]
+        model1_0, model1_1, model1_2, model1_3 =train_scorenet_by_label(train_sub, device)
+        torch.save(model1_0.state_dict(), './models/stft_model9_0.pt')
+        torch.save(model1_1.state_dict(), './models/stft_model9_1.pt')
+        torch.save(model1_2.state_dict(), './models/stft_model9_2.pt')
+        torch.save(model1_3.state_dict(), './models/stft_model9_3.pt')
