@@ -64,7 +64,7 @@ def train_scorenet(train_x, train_y, device):
     score_model = DiffusionModel(device, beta_1, beta_T, T).to(device)
     optim = torch.optim.Adam(score_model.parameters(), lr = 0.0001)
 
-    total_iteration = 1
+    total_iteration = 5000
 
     train_stft = Stft_dataset(train_x, train_y)
 
