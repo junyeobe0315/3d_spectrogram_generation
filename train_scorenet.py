@@ -77,7 +77,7 @@ class Stft_dataset(Dataset):
 def train_scorenet(train_x, train_y, device):
     # dataset
     train_stft = Stft_dataset(train_x, train_y)
-    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=16, shuffle=True, num_workers=0, drop_last=True)
+    dataloader = torch.utils.data.DataLoader(train_stft, batch_size=72, shuffle=True, num_workers=0, drop_last=True)
 
     beta_1 = 1e-4
     beta_T = 0.02
@@ -106,7 +106,7 @@ def train_scorenet(train_x, train_y, device):
             losses.append(loss.item())
             num_items += x.shape[0]
         pbar.set_description("Average Loss : {}".format(sum(losses) / num_items))
-        if ((sum(losses) / num_items) < 3e-5):
+        if ((sum(losses) / num_items) < 5e-5):
             break
     return score_model
 
